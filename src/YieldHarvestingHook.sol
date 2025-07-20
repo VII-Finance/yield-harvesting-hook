@@ -10,26 +10,10 @@ import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/src/type
 import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {ERC4626VaultWrapper} from "src/ERC4626VaultWrapper.sol";
-import {ERC20} from "solmate/tokens/ERC20.sol";
 import {ERC4626} from "solmate/mixins/ERC4626.sol";
 
 contract YieldHarvestingHook is BaseHook {
-    mapping(address asset => uint256 count) public vaultWrappersCreated;
-
-    event VaultWrapperCreated(address indexed asset, address indexed vault, address indexed vaultWrapper);
-
     constructor(IPoolManager _manager) BaseHook(_manager) {}
-
-    function createVaultWrapper(ERC4626 vault) external returns (ERC4626VaultWrapper vaultWrapper) {
-        ERC20 asset = vault.asset();
-        bytes32 salt = keccak256(abi.encodePacked(address(vault), vaultWrappersCreated[address(asset)]));
-
-        //TODO: figure out names and symbols that makes sense and are immutable
-        vaultWrapper = new ERC4626VaultWrapper{salt: salt}(vault, address(this), asset.name(), asset.symbol());
-        vaultWrappersCreated[address(asset)]++;
-
-        emit VaultWrapperCreated(address(asset), address(vault), address(vaultWrapper));
-    }
 
     modifier harvestAndDistributeYield(PoolKey calldata pool) {
         uint256 harvested0 = _currencyToERC4626VaultWrapper(pool.currency0).harvest(address(poolManager));
