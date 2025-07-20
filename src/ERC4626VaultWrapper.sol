@@ -12,8 +12,6 @@ contract ERC4626VaultWrapper is ERC4626 {
     address public immutable yieldHarvester;
     uint256 public immutable unitOfAssets;
 
-    uint256 public sharePriceAtLastHarvest;
-
     error NotYieldHarvester();
 
     constructor(ERC4626 _vault, address _harvester, string memory _name, string memory _symbol)
@@ -21,7 +19,6 @@ contract ERC4626VaultWrapper is ERC4626 {
     {
         underlyingVault = _vault;
         yieldHarvester = _harvester;
-        unitOfAssets = 10 ** _vault.asset().decimals();
         _vault.asset().safeApprove(address(_vault), type(uint256).max);
     }
 
@@ -30,7 +27,15 @@ contract ERC4626VaultWrapper is ERC4626 {
     //////////////////////////////////////////////////////////////*/
 
     function totalAssets() public view override returns (uint256) {
-        return asset.balanceOf(address(this));
+        return totalSupply;
+    }
+
+    function previewMint(uint256 shares) public pure override returns (uint256) {
+        return shares;
+    }
+
+    function previewWithdraw(uint256 assets) public pure override returns (uint256) {
+        return assets;
     }
 
     function convertToShares(uint256 assets) public pure override returns (uint256) {
@@ -50,7 +55,7 @@ contract ERC4626VaultWrapper is ERC4626 {
     }
 
     function maxMint(address) public view override returns (uint256) {
-        return underlyingVault.maxMint(address(this));
+        return maxDeposit(address(0));
     }
 
     function min(uint256 a, uint256 b) internal pure returns (uint256) {
