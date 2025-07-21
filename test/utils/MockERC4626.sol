@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity ^0.8.27;
+pragma solidity ^0.8.26;
 
 import {ERC4626} from "solmate/src/mixins/ERC4626.sol";
 import {MockERC20} from "test/utils/MockERC20.sol";

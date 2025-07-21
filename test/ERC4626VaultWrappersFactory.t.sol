@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity ^0.8.27;
+pragma solidity ^0.8.26;
 
 import {ERC4626VaultWrappersFactory} from "src/ERC4626VaultWrappersFactory.sol";
 import {ERC4626VaultWrapper} from "src/ERC4626VaultWrapper.sol";
@@ -17,7 +17,7 @@ contract ERC4626VaultWrappersFactoryAltTest is Test {
         factory = new ERC4626VaultWrappersFactory(harvester);
     }
 
-    function testCreateVaultWrapper() public {
+    function test_createVaultWrapper() public {
         address vaultAddress = address(new MockERC4626(new MockERC20()));
         address assetAddress = address(ERC4626(vaultAddress).asset());
 

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity ^0.8.27;
+pragma solidity ^0.8.26;
 
 import {BaseHook} from "v4-periphery/src/utils/BaseHook.sol";
 import {IPoolManager, ModifyLiquidityParams, SwapParams} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {BalanceDelta, BalanceDeltaLibrary} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
@@ -13,18 +14,24 @@ import {ERC4626VaultWrapper} from "src/ERC4626VaultWrapper.sol";
 import {ERC4626} from "solmate/src/mixins/ERC4626.sol";
 
 contract YieldHarvestingHook is BaseHook {
+    using StateLibrary for IPoolManager;
+
     constructor(IPoolManager _manager) BaseHook(_manager) {}
 
-    modifier harvestAndDistributeYield(PoolKey calldata pool) {
-        poolManager.sync(pool.currency0);
-        uint256 harvested0 = _currencyToERC4626VaultWrapper(pool.currency0).harvest(address(poolManager));
-        poolManager.settle();
+    modifier harvestAndDistributeYield(PoolKey calldata poolKey) {
+        uint128 liquidity = poolManager.getLiquidity(poolKey.toId());
 
-        poolManager.sync(pool.currency1);
-        uint256 harvested1 = _currencyToERC4626VaultWrapper(pool.currency1).harvest(address(poolManager));
-        poolManager.settle();
+        if (liquidity != 0) {
+            poolManager.sync(poolKey.currency0);
+            uint256 harvested0 = _currencyToERC4626VaultWrapper(poolKey.currency0).harvest(address(poolManager));
+            poolManager.settle();
 
-        poolManager.donate(pool, harvested0, harvested1, "");
+            poolManager.sync(poolKey.currency1);
+            uint256 harvested1 = _currencyToERC4626VaultWrapper(poolKey.currency1).harvest(address(poolManager));
+            poolManager.settle();
+
+            poolManager.donate(poolKey, harvested0, harvested1, "");
+        }
 
         _;
     }
@@ -57,15 +64,13 @@ contract YieldHarvestingHook is BaseHook {
         return this.beforeAddLiquidity.selector;
     }
 
-    function _afterAddLiquidity(
-        address,
-        PoolKey calldata poolKey,
-        ModifyLiquidityParams calldata,
-        BalanceDelta,
-        BalanceDelta,
-        bytes calldata
-    ) internal override harvestAndDistributeYield(poolKey) returns (bytes4, BalanceDelta) {
-        return (this.afterAddLiquidity.selector, BalanceDeltaLibrary.ZERO_DELTA);
+    function _beforeRemoveLiquidity(address, PoolKey calldata poolKey, ModifyLiquidityParams calldata, bytes calldata)
+        internal
+        override
+        harvestAndDistributeYield(poolKey)
+        returns (bytes4)
+    {
+        return this.beforeRemoveLiquidity.selector;
     }
 
     function _beforeSwap(address, PoolKey calldata poolKey, SwapParams calldata, bytes calldata)
