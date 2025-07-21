@@ -2,8 +2,8 @@
 pragma solidity ^0.8.27;
 
 import {ERC4626VaultWrapper} from "src/ERC4626VaultWrapper.sol";
-import {ERC20} from "solmate/tokens/ERC20.sol";
-import {ERC4626} from "solmate/mixins/ERC4626.sol";
+import {ERC20} from "solmate/src/tokens/ERC20.sol";
+import {ERC4626} from "solmate/src/mixins/ERC4626.sol";
 
 contract ERC4626VaultWrappersFactory {
     address public immutable harvester;

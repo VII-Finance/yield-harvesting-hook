@@ -2,39 +2,11 @@
 pragma solidity ^0.8.27;
 
 import {ERC4626VaultWrapper} from "src/ERC4626VaultWrapper.sol";
-import {ERC20} from "solmate/tokens/ERC20.sol";
-import {ERC4626} from "solmate/mixins/ERC4626.sol";
+import {ERC20} from "solmate/src/tokens/ERC20.sol";
+import {ERC4626} from "solmate/src/mixins/ERC4626.sol";
 import {ERC4626Test} from "erc4626-tests/ERC4626.test.sol";
-import {FullMath} from "lib/v4-periphery/lib/v4-core/src/libraries/FullMath.sol";
-
-contract MockERC20 is ERC20 {
-    constructor() ERC20("Mock Token", "MTKN", 18) {}
-
-    function mint(address to, uint256 amount) external {
-        _mint(to, amount);
-    }
-}
-
-contract MockERC4626 is ERC4626 {
-    constructor(MockERC20 asset) ERC4626(asset, "Mock ERC4626", "MERC4626") {}
-
-    function totalAssets() public view override returns (uint256) {
-        return asset.balanceOf(address(this));
-    }
-
-    // solmate ERC4626 does not have phantom overflow protection
-    function convertToShares(uint256 assets) public view override returns (uint256) {
-        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
-
-        return supply == 0 ? assets : FullMath.mulDiv(assets, supply, totalAssets());
-    }
-
-    function convertToAssets(uint256 shares) public view override returns (uint256) {
-        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
-
-        return supply == 0 ? shares : FullMath.mulDiv(shares, totalAssets(), supply);
-    }
-}
+import {MockERC20} from "test/utils/MockERC20.sol";
+import {MockERC4626} from "test/utils/MockERC4626.sol";
 
 contract ERC4626VaultWrapperTest is ERC4626Test {
     address harvester = makeAddr("harvester");

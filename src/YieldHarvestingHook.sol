@@ -10,23 +10,21 @@ import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/src/type
 import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {ERC4626VaultWrapper} from "src/ERC4626VaultWrapper.sol";
-import {ERC4626} from "solmate/mixins/ERC4626.sol";
+import {ERC4626} from "solmate/src/mixins/ERC4626.sol";
 
 contract YieldHarvestingHook is BaseHook {
     constructor(IPoolManager _manager) BaseHook(_manager) {}
 
     modifier harvestAndDistributeYield(PoolKey calldata pool) {
-        uint256 harvested0 = _currencyToERC4626VaultWrapper(pool.currency0).harvest(address(poolManager));
-
         poolManager.sync(pool.currency0);
-
-        uint256 harvested1 = _currencyToERC4626VaultWrapper(pool.currency1).harvest(address(poolManager));
+        uint256 harvested0 = _currencyToERC4626VaultWrapper(pool.currency0).harvest(address(poolManager));
+        poolManager.settle();
 
         poolManager.sync(pool.currency1);
+        uint256 harvested1 = _currencyToERC4626VaultWrapper(pool.currency1).harvest(address(poolManager));
+        poolManager.settle();
 
         poolManager.donate(pool, harvested0, harvested1, "");
-
-        poolManager.settle();
 
         _;
     }
