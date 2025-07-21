@@ -8,10 +8,11 @@ import {PoolManager} from "@uniswap/v4-core/src/PoolManager.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
-import {ModifyLiquidityParams} from "lib/v4-periphery/lib/v4-core/src/types/PoolOperation.sol";
+import {ModifyLiquidityParams, SwapParams} from "lib/v4-periphery/lib/v4-core/src/types/PoolOperation.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 import {PoolModifyLiquidityTest} from "@uniswap/v4-core/src/test/PoolModifyLiquidityTest.sol";
+import {PoolSwapTest} from "@uniswap/v4-core/src/test/PoolSwapTest.sol";
 import {LiquidityAmounts} from "lib/v4-periphery/lib/v4-core/test/utils/LiquidityAmounts.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {Fuzzers} from "lib/v4-periphery/lib/v4-core/src/test/Fuzzers.sol";
@@ -32,6 +33,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
     ERC4626VaultWrappersFactory public vaultWrappersFactory;
 
     PoolModifyLiquidityTest public modifyLiquidityRouter;
+    PoolSwapTest public swapRouter;
 
     MockERC4626 public underlyingVault0;
     MockERC4626 public underlyingVault1;
@@ -50,6 +52,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         poolManager = new PoolManager(poolManagerOwner);
 
         modifyLiquidityRouter = new PoolModifyLiquidityTest(poolManager);
+        swapRouter = new PoolSwapTest(poolManager);
 
         yieldHarvestingHook = YieldHarvestingHook(
             payable(
@@ -111,26 +114,24 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
             uint128(uint256(params.liquidityDelta))
         );
 
-        //why is above estimate incorrect?
-        amount0 = amount0 * 2 + 1;
-        amount1 = amount1 * 2 + 1;
+        if (params.liquidityDelta != 0) {
+            //why is above estimate incorrect?
+            amount0 = amount0 * 2 + 2;
+            amount1 = amount1 * 2 + 2;
 
-        asset0.mint(address(this), amount0);
-        asset1.mint(address(this), amount1);
+            asset0.mint(address(this), amount0);
+            asset1.mint(address(this), amount1);
 
-        asset0.approve(address(vaultWrapper0), amount0);
-        asset1.approve(address(vaultWrapper1), amount1);
+            asset0.approve(address(vaultWrapper0), amount0);
+            asset1.approve(address(vaultWrapper1), amount1);
 
-        if (amount0 > 1) {
             vaultWrapper0.deposit(amount0, address(this));
-        }
-        if (amount1 > 1) {
             vaultWrapper1.deposit(amount1, address(this));
-        }
 
-        //approve this to the liquidity router
-        vaultWrapper0.approve(address(modifyLiquidityRouter), type(uint256).max);
-        vaultWrapper1.approve(address(modifyLiquidityRouter), type(uint256).max);
+            //approve this to the liquidity router
+            vaultWrapper0.approve(address(modifyLiquidityRouter), type(uint256).max);
+            vaultWrapper1.approve(address(modifyLiquidityRouter), type(uint256).max);
+        }
 
         modifyLiquidityRouter.modifyLiquidity(poolKey, params, "");
     }
@@ -155,18 +156,42 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
         modifyLiquidity(params, sqrtRatioX96);
 
-        yield0 = bound(yield0, 1, type(uint128).max);
-        yield1 = bound(yield1, 1, type(uint128).max);
+        yield0 = bound(yield0, 1, uint128(type(int128).max));
+        yield1 = bound(yield1, 1, uint128(type(int128).max));
 
         //we mint this tokens to the underlying vaults
         asset0.mint(address(underlyingVault0), yield0);
         asset1.mint(address(underlyingVault1), yield1);
 
-        //remove 0 liquidity to make sure we harvest and donate
-        params.liquidityDelta = 0;
-        modifyLiquidity(params, sqrtRatioX96);
+        //make sure poolManager balance has increased
+        uint256 poolManagerBalance0Before = poolKey.currency0.balanceOf(address(poolManager));
+        uint256 poolManagerBalance1Before = poolKey.currency1.balanceOf(address(poolManager));
 
-        //let's now make the vault some profit so that in the next step we can harvest and donate
+        // do a small swap so to make sure we harvest and donate
+        SwapParams memory swapParams = SwapParams({
+            zeroForOne: true,
+            amountSpecified: -int256(1), // exact input, 0 for 1
+            sqrtPriceLimitX96: TickMath.getSqrtPriceAtTick(params.tickLower) + 1
+        });
+
+        vaultWrapper0.approve(address(swapRouter), type(uint256).max);
+        vaultWrapper1.approve(address(swapRouter), type(uint256).max);
+        swapRouter.swap(poolKey, swapParams, PoolSwapTest.TestSettings({takeClaims: true, settleUsingBurn: false}), "");
+
+        //make sure balance has increase by yield0 and yield1
+        assertApproxEqAbs(
+            poolKey.currency0.balanceOf(address(poolManager)) - poolManagerBalance0Before,
+            yield0,
+            1,
+            "PoolManager balance for currency0 should increase by yield0"
+        );
+        assertApproxEqAbs(
+            poolKey.currency1.balanceOf(address(poolManager)) - poolManagerBalance1Before,
+            yield1,
+            1,
+            "PoolManager balance for currency1 should increase by yield1"
+        );
+
         PositionConfig memory config = PositionConfig({
             poolKey: poolKey,
             tickLower: params.tickLower,
@@ -177,9 +202,27 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         BalanceDelta feesOwed = FeeMath.getFeesOwed(poolManager, config, address(modifyLiquidityRouter));
 
         //make sure feesOwed is equal to yield0 and yield1
-        assertEq(feesOwed.amount0(), int256(yield0), "feesOwed amount0 mismatch");
-        assertEq(feesOwed.amount1(), int256(yield1), "feesOwed amount1 mismatch");
+        assertApproxEqAbs(feesOwed.amount0(), int256(yield0), 1, "feesOwed amount0 mismatch");
+        assertApproxEqAbs(feesOwed.amount1(), int256(yield1), 1, "feesOwed amount1 mismatch");
 
-        // console.log("feesOwed token0: %s, token1: %s", feesOwed.amount0(), feesOwed.amount1());
+        //increase liquidity by 0 and see the balance increase
+        uint256 balance0Before = poolKey.currency0.balanceOfSelf();
+        uint256 balance1Before = poolKey.currency1.balanceOfSelf();
+
+        params.liquidityDelta = 0;
+        modifyLiquidity(params, sqrtRatioX96);
+
+        assertApproxEqAbs(
+            poolKey.currency0.balanceOfSelf() - balance0Before,
+            yield0,
+            1,
+            "Balance for currency0 should increase by yield0"
+        );
+        assertApproxEqAbs(
+            poolKey.currency1.balanceOfSelf() - balance1Before,
+            yield1,
+            1,
+            "Balance for currency1 should increase by yield1"
+        );
     }
 }

@@ -13,6 +13,8 @@ import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {ERC4626VaultWrapper} from "src/ERC4626VaultWrapper.sol";
 import {ERC4626} from "solmate/src/mixins/ERC4626.sol";
 
+import {console} from "forge-std/console.sol";
+
 contract YieldHarvestingHook is BaseHook {
     using StateLibrary for IPoolManager;
 
@@ -22,15 +24,18 @@ contract YieldHarvestingHook is BaseHook {
         uint128 liquidity = poolManager.getLiquidity(poolKey.toId());
 
         if (liquidity != 0) {
+            uint256 yield0 = _currencyToERC4626VaultWrapper(poolKey.currency0).pendingYield();
+            uint256 yield1 = _currencyToERC4626VaultWrapper(poolKey.currency1).pendingYield();
+
+            poolManager.donate(poolKey, yield0, yield1, "");
+
             poolManager.sync(poolKey.currency0);
-            uint256 harvested0 = _currencyToERC4626VaultWrapper(poolKey.currency0).harvest(address(poolManager));
+            _currencyToERC4626VaultWrapper(poolKey.currency0).harvest(address(poolManager));
             poolManager.settle();
 
             poolManager.sync(poolKey.currency1);
-            uint256 harvested1 = _currencyToERC4626VaultWrapper(poolKey.currency1).harvest(address(poolManager));
+            _currencyToERC4626VaultWrapper(poolKey.currency1).harvest(address(poolManager));
             poolManager.settle();
-
-            poolManager.donate(poolKey, harvested0, harvested1, "");
         }
 
         _;
