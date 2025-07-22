@@ -21,20 +21,17 @@ contract ERC4626VaultWrappersFactoryAltTest is Test {
         address vaultAddress = address(new MockERC4626(new MockERC20()));
         address assetAddress = address(ERC4626(vaultAddress).asset());
 
-        address expectedWrapperAddress =
-            factory.getVaultWrapperAddress(vaultAddress, factory.vaultWrappersCount(vaultAddress));
+        address expectedWrapperAddress = factory.getVaultWrapperAddress(vaultAddress);
 
         vm.expectEmit();
-        emit ERC4626VaultWrappersFactory.VaultWrapperCreated(assetAddress, vaultAddress, expectedWrapperAddress);
+        emit ERC4626VaultWrappersFactory.VaultWrapperCreated(vaultAddress, expectedWrapperAddress);
 
         ERC4626VaultWrapper wrapper = factory.createVaultWrapper(ERC4626(vaultAddress));
 
         assertEq(address(wrapper), expectedWrapperAddress);
         assertEq(wrapper.yieldHarvester(), harvester);
-        assertEq(wrapper.name(), "Mock Token");
-        assertEq(wrapper.symbol(), "MTKN");
+        assertEq(wrapper.name(), factory.getWrapperName(ERC4626(vaultAddress)));
+        assertEq(wrapper.symbol(), factory.getWrapperSymbol(ERC4626(vaultAddress)));
         assertEq(address(wrapper.asset()), assetAddress);
-
-        assertEq(factory.vaultWrappersCount(vaultAddress), 1);
     }
 }

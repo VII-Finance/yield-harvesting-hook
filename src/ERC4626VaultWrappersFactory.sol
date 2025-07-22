@@ -7,23 +7,29 @@ import {ERC4626} from "solmate/src/mixins/ERC4626.sol";
 
 contract ERC4626VaultWrappersFactory {
     address public immutable harvester;
-    mapping(address asset => uint256 count) public vaultWrappersCount;
 
-    event VaultWrapperCreated(address indexed asset, address indexed vault, address indexed vaultWrapper);
+    event VaultWrapperCreated(address indexed vault, address indexed vaultWrapper);
 
     constructor(address _harvester) {
         harvester = _harvester;
     }
 
     function createVaultWrapper(ERC4626 vault) external returns (ERC4626VaultWrapper vaultWrapper) {
-        ERC20 asset = vault.asset();
-        bytes32 salt = keccak256(abi.encodePacked(address(vault), vaultWrappersCount[address(vault)]));
+        bytes32 salt = keccak256(abi.encodePacked(address(vault)));
 
         // TODO: make sure naming is something that makes sense and is numbered correctly
-        vaultWrapper = new ERC4626VaultWrapper{salt: salt}(vault, harvester, asset.name(), asset.symbol());
-        vaultWrappersCount[address(vault)]++;
+        vaultWrapper =
+            new ERC4626VaultWrapper{salt: salt}(vault, harvester, getWrapperName(vault), getWrapperSymbol(vault));
 
-        emit VaultWrapperCreated(address(asset), address(vault), address(vaultWrapper));
+        emit VaultWrapperCreated(address(vault), address(vaultWrapper));
+    }
+
+    function getWrapperName(ERC4626 vault) public view returns (string memory) {
+        return string(abi.encodePacked("VII Finance Wrapped ", vault.name()));
+    }
+
+    function getWrapperSymbol(ERC4626 vault) public view returns (string memory) {
+        return string(abi.encodePacked("VII-", vault.symbol()));
     }
 
     function _computeCreate2Address(bytes32 salt, bytes memory bytecode) internal view returns (address) {
@@ -32,14 +38,14 @@ contract ERC4626VaultWrappersFactory {
     }
 
     function getVaultWrapperBytecode(address vault) public view returns (bytes memory) {
-        ERC20 asset = ERC4626(vault).asset();
         return abi.encodePacked(
-            type(ERC4626VaultWrapper).creationCode, abi.encode(vault, harvester, asset.name(), asset.symbol())
+            type(ERC4626VaultWrapper).creationCode,
+            abi.encode(vault, harvester, getWrapperName(ERC4626(vault)), getWrapperSymbol(ERC4626(vault)))
         );
     }
 
-    function getVaultWrapperAddress(address vault, uint256 vaultCount) public view returns (address) {
-        bytes32 salt = keccak256(abi.encodePacked(vault, vaultCount));
+    function getVaultWrapperAddress(address vault) public view returns (address) {
+        bytes32 salt = keccak256(abi.encodePacked(vault));
         bytes memory bytecode = getVaultWrapperBytecode(vault);
         return _computeCreate2Address(salt, bytecode);
     }
