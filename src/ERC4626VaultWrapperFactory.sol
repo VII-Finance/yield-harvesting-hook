@@ -19,7 +19,6 @@ contract ERC4626VaultWrapperFactory {
     function createVaultWrapper(ERC4626 vault) external returns (ERC4626VaultWrapper vaultWrapper) {
         bytes32 salt = keccak256(abi.encodePacked(address(vault)));
 
-        // TODO: make sure naming is something that makes sense and is numbered correctly
         vaultWrapper =
             new ERC4626VaultWrapper{salt: salt}(vault, harvester, getWrapperName(vault), getWrapperSymbol(vault));
 
