@@ -12,7 +12,6 @@ import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {BeforeSwapDelta, toBeforeSwapDelta} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {SafeCast} from "@uniswap/v4-core/src/libraries/SafeCast.sol";
-import {console} from "forge-std/console.sol";
 
 contract ERC4626VaultWrapperHook is BaseHook, ERC4626 {
     using SafeCast for uint256;
@@ -193,23 +192,5 @@ contract ERC4626VaultWrapperHook is BaseHook, ERC4626 {
     // In case there is bad debt socialization, the insurance fund can burn their tokens to make sure the vault is solvent
     function burn(uint256 amount) external {
         _burn(msg.sender, amount);
-    }
-
-    function redeem(uint256 shares, address receiver, address owner) public override returns (uint256 assets) {
-        printCurrentState();
-        assets = super.redeem(shares, receiver, owner);
-    }
-
-    function deposit(uint256 assets, address receiver) public override returns (uint256 shares) {
-        printCurrentState();
-        shares = super.deposit(assets, receiver);
-        printCurrentState();
-    }
-
-    function printCurrentState() public view {
-        console.log("total supply of underlying vault shares: ", ERC4626(address(asset)).totalSupply());
-        console.log("total assets of underlying vault: ", ERC4626(address(asset)).totalAssets());
-        console.log("Total underlying shares in this contract: ", totalAssets());
-        console.log("total supply of wrapped shares: ", totalSupply);
     }
 }
