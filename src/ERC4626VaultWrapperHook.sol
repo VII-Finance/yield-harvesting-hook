@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.26;
 
-import {ERC4626VaultWrapper} from "./ERC4626VaultWrapper.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {BaseHook} from "v4-periphery/src/utils/BaseHook.sol";
 import {IPoolManager, SwapParams} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
@@ -13,6 +12,12 @@ import {BeforeSwapDelta, toBeforeSwapDelta} from "@uniswap/v4-core/src/types/Bef
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {SafeCast} from "@uniswap/v4-core/src/libraries/SafeCast.sol";
 
+/**
+ * @notice This vault wrapper is intended for use with lending protocol vaults where the underlying vault share price monotonically increases.
+ * @dev If the underlying vault share price drops, this vault may become insolvent. In cases of bad debt socialization within the lending protocol vaults, the share price can decrease.
+ *      It is recommended to have an insurance fund capable of burning tokens to restore solvency if needed.
+ *      No harvest operations will occur until the vault regains solvency.
+ */
 contract ERC4626VaultWrapperHook is BaseHook, ERC4626 {
     using SafeCast for uint256;
     using SafeTransferLib for ERC20;
@@ -189,7 +194,6 @@ contract ERC4626VaultWrapperHook is BaseHook, ERC4626 {
         _mint(to, harvestedAssets);
     }
 
-    // In case there is bad debt socialization, the insurance fund can burn their tokens to make sure the vault is solvent
     function burn(uint256 amount) external {
         _burn(msg.sender, amount);
     }

@@ -18,7 +18,7 @@ import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {Fuzzers} from "lib/v4-periphery/lib/v4-core/src/test/Fuzzers.sol";
 
 import {YieldHarvestingHook} from "src/YieldHarvestingHook.sol";
-import {ERC4626VaultWrapperHookFactory} from "src/ERC4626VaultWrapperHookFactory.sol";
+import {ERC4626VaultWrapperFactory} from "src/ERC4626VaultWrapperFactory.sol";
 import {ERC4626VaultWrapper} from "src/ERC4626VaultWrapper.sol";
 import {MockERC4626} from "test/utils/MockERC4626.sol";
 import {MockERC20} from "test/utils/MockERC20.sol";
@@ -30,7 +30,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
     PoolManager public poolManager;
     YieldHarvestingHook public yieldHarvestingHook;
-    ERC4626VaultWrapperHookFactory public vaultWrappersFactory;
+    ERC4626VaultWrapperFactory public vaultWrappersFactory;
 
     PoolModifyLiquidityTest public modifyLiquidityRouter;
     PoolSwapTest public swapRouter;
@@ -67,7 +67,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
         deployCodeTo("YieldHarvestingHook", abi.encode(poolManager), address(yieldHarvestingHook));
 
-        vaultWrappersFactory = new ERC4626VaultWrapperHookFactory(poolManager, address(yieldHarvestingHook));
+        vaultWrappersFactory = new ERC4626VaultWrapperFactory(address(yieldHarvestingHook));
 
         // Deploy as assetA, underlyingVaultB, etc.
         MockERC20 assetA = new MockERC20();
@@ -122,11 +122,17 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
             asset0.mint(address(this), amount0);
             asset1.mint(address(this), amount1);
 
-            asset0.approve(address(vaultWrapper0), amount0);
-            asset1.approve(address(vaultWrapper1), amount1);
+            asset0.approve(address(underlyingVault0), amount0);
+            asset1.approve(address(underlyingVault1), amount1);
 
-            vaultWrapper0.deposit(amount0, address(this));
-            vaultWrapper1.deposit(amount1, address(this));
+            uint256 underlyingVaultShares0 = underlyingVault0.deposit(amount0, address(this));
+            uint256 underlyingVaultShares1 = underlyingVault1.deposit(amount1, address(this));
+
+            underlyingVault0.approve(address(vaultWrapper0), underlyingVaultShares0);
+            underlyingVault1.approve(address(vaultWrapper1), underlyingVaultShares1);
+
+            vaultWrapper0.deposit(underlyingVaultShares0, address(this));
+            vaultWrapper1.deposit(underlyingVaultShares1, address(this));
 
             //approve this to the liquidity router
             vaultWrapper0.approve(address(modifyLiquidityRouter), type(uint256).max);

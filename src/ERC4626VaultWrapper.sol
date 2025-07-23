@@ -2,24 +2,22 @@
 pragma solidity ^0.8.26;
 
 import {ERC4626} from "solmate/src/mixins/ERC4626.sol";
-import {ERC20} from "solmate/src/tokens/ERC20.sol";
-import {SafeTransferLib} from "solmate/src/utils/SafeTransferLib.sol";
 
+/**
+ * @notice This vault wrapper is intended for use with lending protocol vaults where the underlying vault share price monotonically increases.
+ * @dev If the underlying vault share price drops, this vault may become insolvent. In cases of bad debt socialization within the lending protocol vaults, the share price can decrease.
+ *      It is recommended to have an insurance fund capable of burning tokens to restore solvency if needed.
+ *      No harvest operations will occur until the vault regains solvency.
+ */
 contract ERC4626VaultWrapper is ERC4626 {
-    using SafeTransferLib for ERC20;
-
-    ERC4626 public immutable underlyingVault;
-    address public immutable yieldHarvester;
-    uint256 public immutable unitOfAssets;
+    address public immutable yieldHarvestingHook;
 
     error NotYieldHarvester();
 
-    constructor(ERC4626 _vault, address _harvester, string memory _name, string memory _symbol)
-        ERC4626(_vault.asset(), _name, _symbol)
+    constructor(ERC4626 _underlyingVault, address _yieldHarvestingHook, string memory _name, string memory _symbol)
+        ERC4626(_underlyingVault, _name, _symbol)
     {
-        underlyingVault = _vault;
-        yieldHarvester = _harvester;
-        _vault.asset().safeApprove(address(_vault), type(uint256).max);
+        yieldHarvestingHook = _yieldHarvestingHook;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -27,23 +25,31 @@ contract ERC4626VaultWrapper is ERC4626 {
     //////////////////////////////////////////////////////////////*/
 
     function totalAssets() public view override returns (uint256) {
-        return totalSupply;
+        return asset.balanceOf(address(this));
     }
 
-    function previewMint(uint256 shares) public pure override returns (uint256) {
-        return shares;
+    function previewMint(uint256 shares) public view override returns (uint256) {
+        return ERC4626(address(asset)).previewWithdraw(shares);
     }
 
-    function previewWithdraw(uint256 assets) public pure override returns (uint256) {
-        return assets;
+    function previewWithdraw(uint256 assets) public view override returns (uint256) {
+        return ERC4626(address(asset)).previewMint(assets);
     }
 
-    function convertToShares(uint256 assets) public pure override returns (uint256) {
-        return assets;
+    function previewDeposit(uint256 assets) public view override returns (uint256) {
+        return ERC4626(address(asset)).previewRedeem(assets);
     }
 
-    function convertToAssets(uint256 shares) public pure override returns (uint256) {
-        return shares;
+    function previewRedeem(uint256 shares) public view override returns (uint256) {
+        return ERC4626(address(asset)).previewDeposit(shares);
+    }
+
+    function convertToShares(uint256 assets) public view override returns (uint256) {
+        return ERC4626(address(asset)).convertToAssets(assets);
+    }
+
+    function convertToAssets(uint256 shares) public view override returns (uint256) {
+        return ERC4626(address(asset)).convertToShares(shares);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -51,11 +57,11 @@ contract ERC4626VaultWrapper is ERC4626 {
     //////////////////////////////////////////////////////////////*/
 
     function maxDeposit(address) public view override returns (uint256) {
-        return underlyingVault.maxDeposit(address(this));
+        return ERC4626(address(asset)).maxMint(address(this));
     }
 
     function maxMint(address) public view override returns (uint256) {
-        return maxDeposit(address(0));
+        return ERC4626(address(asset)).maxDeposit(address(this));
     }
 
     function min(uint256 a, uint256 b) internal pure returns (uint256) {
@@ -63,32 +69,28 @@ contract ERC4626VaultWrapper is ERC4626 {
     }
 
     function maxWithdraw(address owner) public view override returns (uint256) {
-        return min(underlyingVault.maxWithdraw(address(this)), balanceOf[owner]);
+        return convertToAssets(maxRedeem(owner));
     }
 
     function maxRedeem(address owner) public view override returns (uint256) {
-        return maxWithdraw(owner);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                          INTERNAL HOOKS LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    function beforeWithdraw(uint256 assets, uint256) internal override {
-        underlyingVault.withdraw(assets, address(this), address(this));
-    }
-
-    function afterDeposit(uint256 assets, uint256) internal override {
-        underlyingVault.deposit(assets, address(this));
+        return min(ERC4626(address(asset)).maxWithdraw(address(this)), balanceOf[owner]);
     }
 
     function pendingYield() public view returns (uint256) {
-        return underlyingVault.maxWithdraw(address(this)) - totalSupply;
+        uint256 maxWithdrawableAssets = ERC4626(address(asset)).maxWithdraw(address(this));
+        if (maxWithdrawableAssets > totalSupply) {
+            return maxWithdrawableAssets - totalSupply;
+        }
+        return 0;
     }
 
     function harvest(address to) external returns (uint256 harvestedAssets) {
-        if (msg.sender != yieldHarvester) revert NotYieldHarvester();
+        if (msg.sender != yieldHarvestingHook) revert NotYieldHarvester();
         harvestedAssets = pendingYield();
         _mint(to, harvestedAssets);
+    }
+
+    function burn(uint256 amount) external {
+        _burn(msg.sender, amount);
     }
 }

@@ -6,14 +6,13 @@ import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {ERC4626} from "solmate/src/mixins/ERC4626.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 
-contract ERC4626VaultWrapperHookFactory {
+contract ERC4626VaultWrapperFactory {
     IPoolManager public immutable poolManager;
     address public immutable harvester;
 
     event VaultWrapperCreated(address indexed vault, address indexed vaultWrapper);
 
-    constructor(IPoolManager _poolManager, address _harvester) {
-        poolManager = _poolManager;
+    constructor(address _harvester) {
         harvester = _harvester;
     }
 
