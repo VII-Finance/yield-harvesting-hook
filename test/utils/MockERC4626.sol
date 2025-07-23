@@ -24,4 +24,16 @@ contract MockERC4626 is ERC4626 {
 
         return supply == 0 ? shares : FullMath.mulDiv(shares, totalAssets(), supply);
     }
+
+    function previewMint(uint256 shares) public view override returns (uint256) {
+        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+
+        return supply == 0 ? shares : FullMath.mulDivRoundingUp(shares, totalAssets(), supply);
+    }
+
+    function previewWithdraw(uint256 assets) public view override returns (uint256) {
+        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+
+        return supply == 0 ? assets : FullMath.mulDivRoundingUp(assets, supply, totalAssets());
+    }
 }
