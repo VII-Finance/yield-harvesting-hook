@@ -98,13 +98,13 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
     modifier checkInvariants() {
         _;
 
-        // assertEq(ERC20(_underlying_).balanceOf(_vault_), 0, "Underlying asset balance in vault wrapper should be zero");
+        assertEq(underlyingAsset.balanceOf(_vault_), 0, "Underlying asset balance in vault wrapper should be zero");
 
-        // assertEq(
-        //     ERC4626VaultWrapper(_vault_).totalAssets(),
-        //     underlyingVault.convertToAssets(underlyingVault.balanceOf(_vault_)),
-        //     "Total assets in vault wrapper should equal underlying vault's converted assets"
-        // );
+        assertLe(
+            ERC4626VaultWrapper(_vault_).totalSupply(),
+            underlyingVault.convertToAssets(underlyingVault.balanceOf(_vault_)),
+            "Total vault shares minted should be equal to actual assets underlying vault shares are worth"
+        );
     }
 
     function test_asset(Init memory init) public virtual override checkInvariants {
