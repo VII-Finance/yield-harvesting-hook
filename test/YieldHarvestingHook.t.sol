@@ -18,7 +18,7 @@ import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {Fuzzers} from "lib/v4-periphery/lib/v4-core/src/test/Fuzzers.sol";
 
 import {YieldHarvestingHook} from "src/YieldHarvestingHook.sol";
-import {ERC4626VaultWrappersFactory} from "src/ERC4626VaultWrappersFactory.sol";
+import {ERC4626VaultWrapperHookFactory} from "src/ERC4626VaultWrapperHookFactory.sol";
 import {ERC4626VaultWrapper} from "src/ERC4626VaultWrapper.sol";
 import {MockERC4626} from "test/utils/MockERC4626.sol";
 import {MockERC20} from "test/utils/MockERC20.sol";
@@ -30,7 +30,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
     PoolManager public poolManager;
     YieldHarvestingHook public yieldHarvestingHook;
-    ERC4626VaultWrappersFactory public vaultWrappersFactory;
+    ERC4626VaultWrapperHookFactory public vaultWrappersFactory;
 
     PoolModifyLiquidityTest public modifyLiquidityRouter;
     PoolSwapTest public swapRouter;
@@ -67,7 +67,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
         deployCodeTo("YieldHarvestingHook", abi.encode(poolManager), address(yieldHarvestingHook));
 
-        vaultWrappersFactory = new ERC4626VaultWrappersFactory(address(yieldHarvestingHook));
+        vaultWrappersFactory = new ERC4626VaultWrapperHookFactory(poolManager, address(yieldHarvestingHook));
 
         // Deploy as assetA, underlyingVaultB, etc.
         MockERC20 assetA = new MockERC20();

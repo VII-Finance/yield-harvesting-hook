@@ -13,8 +13,6 @@ import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {ERC4626VaultWrapper} from "src/ERC4626VaultWrapper.sol";
 import {ERC4626} from "solmate/src/mixins/ERC4626.sol";
 
-import {console} from "forge-std/console.sol";
-
 contract YieldHarvestingHook is BaseHook {
     using StateLibrary for IPoolManager;
 

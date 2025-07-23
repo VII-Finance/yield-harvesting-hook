@@ -4,7 +4,6 @@ pragma solidity ^0.8.26;
 import {ERC4626} from "solmate/src/mixins/ERC4626.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/src/utils/SafeTransferLib.sol";
-import {BaseHook} from "v4-periphery/src/utils/BaseHook.sol";
 
 contract ERC4626VaultWrapper is ERC4626 {
     using SafeTransferLib for ERC20;
