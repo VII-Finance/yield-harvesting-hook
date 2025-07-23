@@ -25,15 +25,21 @@ contract YieldHarvestingHook is BaseHook {
             uint256 yield0 = _currencyToERC4626VaultWrapper(poolKey.currency0).pendingYield();
             uint256 yield1 = _currencyToERC4626VaultWrapper(poolKey.currency1).pendingYield();
 
-            poolManager.donate(poolKey, yield0, yield1, "");
+            if (yield0 != 0 || yield1 != 0) {
+                poolManager.donate(poolKey, yield0, yield1, "");
 
-            poolManager.sync(poolKey.currency0);
-            _currencyToERC4626VaultWrapper(poolKey.currency0).harvest(address(poolManager));
-            poolManager.settle();
+                if (yield0 != 0) {
+                    poolManager.sync(poolKey.currency0);
+                    _currencyToERC4626VaultWrapper(poolKey.currency0).harvest(address(poolManager));
+                    poolManager.settle();
+                }
 
-            poolManager.sync(poolKey.currency1);
-            _currencyToERC4626VaultWrapper(poolKey.currency1).harvest(address(poolManager));
-            poolManager.settle();
+                if (yield1 != 0) {
+                    poolManager.sync(poolKey.currency1);
+                    _currencyToERC4626VaultWrapper(poolKey.currency1).harvest(address(poolManager));
+                    poolManager.settle();
+                }
+            }
         }
 
         _;

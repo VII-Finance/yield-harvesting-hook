@@ -76,6 +76,10 @@ contract ERC4626VaultWrapper is ERC4626 {
         return min(ERC4626(address(asset)).maxWithdraw(address(this)), balanceOf[owner]);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                            HARVEST YIELD LOGIC
+    //////////////////////////////////////////////////////////////*/
+
     function pendingYield() public view returns (uint256) {
         uint256 maxWithdrawableAssets = ERC4626(address(asset)).maxWithdraw(address(this));
         if (maxWithdrawableAssets > totalSupply) {
@@ -87,7 +91,7 @@ contract ERC4626VaultWrapper is ERC4626 {
     function harvest(address to) external returns (uint256 harvestedAssets) {
         if (msg.sender != yieldHarvestingHook) revert NotYieldHarvester();
         harvestedAssets = pendingYield();
-        _mint(to, harvestedAssets);
+        if (harvestedAssets > 0) _mint(to, harvestedAssets);
     }
 
     function burn(uint256 amount) external {
