@@ -19,8 +19,8 @@ contract ERC4626VaultWrapperFactory {
     function createVaultWrapper(ERC4626 vault) external returns (ERC4626VaultWrapper vaultWrapper) {
         bytes32 salt = keccak256(abi.encodePacked(address(vault)));
 
-        vaultWrapper =
-            new ERC4626VaultWrapper{salt: salt}(vault, harvester, getWrapperName(vault), getWrapperSymbol(vault));
+        vaultWrapper = new ERC4626VaultWrapper{salt: salt}(harvester);
+        vaultWrapper.initialize(address(vault), getWrapperName(vault), getWrapperSymbol(vault));
 
         emit VaultWrapperCreated(address(vault), address(vaultWrapper));
     }
@@ -39,10 +39,7 @@ contract ERC4626VaultWrapperFactory {
     }
 
     function getVaultWrapperBytecode(address vault) public view returns (bytes memory) {
-        return abi.encodePacked(
-            type(ERC4626VaultWrapper).creationCode,
-            abi.encode(vault, harvester, getWrapperName(ERC4626(vault)), getWrapperSymbol(ERC4626(vault)))
-        );
+        return abi.encodePacked(type(ERC4626VaultWrapper).creationCode, abi.encode(harvester));
     }
 
     function getVaultWrapperAddress(address vault) public view returns (address) {
