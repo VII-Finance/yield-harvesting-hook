@@ -23,7 +23,8 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
         underlyingVault = new MockERC4626(underlyingAsset);
         _underlying_ = address(underlyingVault);
 
-        _vault_ = address(new ERC4626VaultWrapper(underlyingVault, harvester, "Vault Wrapper", "VW"));
+        _vault_ = address(new ERC4626VaultWrapper(harvester));
+        ERC4626VaultWrapper(_vault_).initialize(address(underlyingVault), "Vault Wrapper", "VW");
 
         _delta_ = 0;
         _vaultMayBeEmpty = false;
@@ -35,6 +36,7 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
         for (uint256 i = 0; i < N; i++) {
             address user = init.user[i];
             vm.assume(_isEOA(user));
+            vm.assume(user != address(0));
             // shares
             uint256 shares = init.share[i];
 
