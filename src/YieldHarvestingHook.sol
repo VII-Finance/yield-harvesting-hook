@@ -11,12 +11,16 @@ import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/src/type
 import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {ERC4626VaultWrapper} from "src/ERC4626VaultWrapper.sol";
-import {ERC4626} from "solmate/src/mixins/ERC4626.sol";
+import {Clones} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/Clones.sol";
 
 contract YieldHarvestingHook is BaseHook {
     using StateLibrary for IPoolManager;
 
-    constructor(IPoolManager _manager) BaseHook(_manager) {}
+    address public immutable vaultWrapperImplementation;
+
+    constructor(IPoolManager _manager) BaseHook(_manager) {
+        vaultWrapperImplementation = address(new ERC4626VaultWrapper(address(this)));
+    }
 
     modifier harvestAndDistributeYield(PoolKey calldata poolKey) {
         uint128 liquidity = poolManager.getLiquidity(poolKey.toId());
@@ -44,6 +48,8 @@ contract YieldHarvestingHook is BaseHook {
 
         _;
     }
+
+    function initialize(PoolKey calldata poolKey, address underlyingVault0, address underlyingVault1) external {}
 
     function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
         return Hooks.Permissions({

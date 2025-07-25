@@ -38,13 +38,13 @@ contract ERC4626VaultWrapperFactory {
         return address(uint160(uint256(hash)));
     }
 
-    function getVaultWrapperBytecode(address vault) public view returns (bytes memory) {
+    function getVaultWrapperBytecode() public view returns (bytes memory) {
         return abi.encodePacked(type(ERC4626VaultWrapper).creationCode, abi.encode(harvester));
     }
 
     function getVaultWrapperAddress(address vault) public view returns (address) {
         bytes32 salt = keccak256(abi.encodePacked(vault));
-        bytes memory bytecode = getVaultWrapperBytecode(vault);
+        bytes memory bytecode = getVaultWrapperBytecode();
         return _computeCreate2Address(salt, bytecode);
     }
 }
