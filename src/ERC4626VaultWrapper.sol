@@ -14,7 +14,7 @@ import {
  *      No harvest operations will occur until the vault regains solvency.
  */
 contract ERC4626VaultWrapper is ERC4626Upgradeable {
-    address public yieldHarvestingHook;
+    address public immutable yieldHarvestingHook;
 
     error NotYieldHarvester();
 
