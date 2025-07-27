@@ -23,7 +23,9 @@ import {ERC4626VaultWrapper} from "src/ERC4626VaultWrapper.sol";
 import {MockERC4626} from "test/utils/MockERC4626.sol";
 import {MockERC20} from "test/utils/MockERC20.sol";
 import {FeeMath, PositionConfig} from "test/utils/libraries/FeeMath.sol";
-import {console} from "forge-std/console.sol";
+import {IERC4626} from
+    "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
+import {Constants} from "@uniswap/v4-core/test/utils/Constants.sol";
 
 contract YieldHarvestingHookTest is Fuzzers, Test {
     using StateLibrary for PoolManager;
@@ -67,33 +69,33 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
         deployCodeTo("YieldHarvestingHook", abi.encode(poolManager), address(yieldHarvestingHook));
 
-        vaultWrappersFactory = new ERC4626VaultWrapperFactory(address(yieldHarvestingHook));
+        vaultWrappersFactory = new ERC4626VaultWrapperFactory(poolManager, address(yieldHarvestingHook));
 
-        // Deploy as assetA, underlyingVaultB, etc.
         MockERC20 assetA = new MockERC20();
-        MockERC4626 underlyingVaultB = new MockERC4626(assetA);
-        ERC4626VaultWrapper vaultWrapperA = vaultWrappersFactory.createVaultWrapper(underlyingVaultB);
+        MockERC4626 underlyingVaultA = new MockERC4626(assetA);
 
         MockERC20 assetB = new MockERC20();
-        MockERC4626 underlyingVaultA = new MockERC4626(assetB);
-        ERC4626VaultWrapper vaultWrapperB = vaultWrappersFactory.createVaultWrapper(underlyingVaultA);
-
+        MockERC4626 underlyingVaultB = new MockERC4626(assetB);
+        (ERC4626VaultWrapper vaultWrapperA, ERC4626VaultWrapper vaultWrapperB) = vaultWrappersFactory
+            .initializePoolForTwoVault(
+            3000, 60, IERC4626(address(underlyingVaultA)), IERC4626(address(underlyingVaultB)), Constants.SQRT_PRICE_1_1
+        );
         // Compare vaultWrapper addresses and assign 0/1 based on which is lower
         if (address(vaultWrapperA) < address(vaultWrapperB)) {
             asset0 = assetA;
-            underlyingVault0 = underlyingVaultB;
+            underlyingVault0 = underlyingVaultA;
             vaultWrapper0 = vaultWrapperA;
 
             asset1 = assetB;
-            underlyingVault1 = underlyingVaultA;
+            underlyingVault1 = underlyingVaultB;
             vaultWrapper1 = vaultWrapperB;
         } else {
             asset0 = assetB;
-            underlyingVault0 = underlyingVaultA;
+            underlyingVault0 = underlyingVaultB;
             vaultWrapper0 = vaultWrapperB;
 
             asset1 = assetA;
-            underlyingVault1 = underlyingVaultB;
+            underlyingVault1 = underlyingVaultA;
             vaultWrapper1 = vaultWrapperA;
         }
 
@@ -142,14 +144,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         modifyLiquidityRouter.modifyLiquidity(poolKey, params, "");
     }
 
-    function test_donateLiquidity(
-        ModifyLiquidityParams memory params,
-        int256 startingSqrtPriceX96,
-        uint256 yield0,
-        uint256 yield1
-    ) public {
-        poolManager.initialize(poolKey, createRandomSqrtPriceX96(poolKey.tickSpacing, startingSqrtPriceX96));
-
+    function test_donateLiquidity(ModifyLiquidityParams memory params, uint256 yield0, uint256 yield1) public {
         //liquidity to full range to make test simpler
         params.tickLower = TickMath.minUsableTick(poolKey.tickSpacing);
         params.tickUpper = TickMath.maxUsableTick(poolKey.tickSpacing);
