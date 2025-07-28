@@ -72,7 +72,7 @@ contract AaveWrapper is ERC4626Upgradeable {
         return maxWithdraw(owner);
     }
 
-    function _maxAssetsSuppliableToAave() internal view returns (uint256) {
+    function _maxAssetsSuppliableToAave() internal view virtual returns (uint256) {
         // returns 0 if reserve is not active, frozen, or paused
         // returns max uint256 value if supply cap is 0 (not capped)
         // returns supply cap - current amount supplied as max suppliable if there is a supply cap for this reserve
@@ -102,7 +102,7 @@ contract AaveWrapper is ERC4626Upgradeable {
         }
     }
 
-    function _maxAssetsWithdrawableFromAave() internal view returns (uint256) {
+    function _maxAssetsWithdrawableFromAave() internal view virtual returns (uint256) {
         // returns 0 if reserve is not active, or paused
         // otherwise, returns available liquidity
 
@@ -118,7 +118,9 @@ contract AaveWrapper is ERC4626Upgradeable {
     }
 
     function pendingYield() public view returns (uint256) {
-        uint256 maxWithdrawableAssets = maxWithdraw(address(this));
+        uint256 maxWithdrawableAssets =
+            Math.min(_maxAssetsWithdrawableFromAave(), underlyingAToken().balanceOf(address(this)));
+
         uint256 currentSupply = totalSupply();
         if (maxWithdrawableAssets > currentSupply) {
             return maxWithdrawableAssets - currentSupply;
