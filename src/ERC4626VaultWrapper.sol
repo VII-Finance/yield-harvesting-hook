@@ -4,6 +4,7 @@ pragma solidity ^0.8.26;
 import {
     IERC4626,
     IERC20,
+    Math,
     ERC4626Upgradeable
 } from "lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
 
@@ -67,16 +68,12 @@ contract ERC4626VaultWrapper is ERC4626Upgradeable {
         return underlyingVault().maxDeposit(address(this));
     }
 
-    function min(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a < b ? a : b;
-    }
-
     function maxWithdraw(address owner) public view override returns (uint256) {
         return convertToAssets(maxRedeem(owner));
     }
 
     function maxRedeem(address owner) public view override returns (uint256) {
-        return min(underlyingVault().maxWithdraw(address(this)), balanceOf(owner));
+        return Math.min(underlyingVault().maxWithdraw(address(this)), balanceOf(owner));
     }
 
     function pendingYield() public view returns (uint256) {
