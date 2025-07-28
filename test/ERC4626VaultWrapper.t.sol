@@ -18,7 +18,7 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
     uint160 hookPermissionCount = 14;
     uint160 clearAllHookPermissionsMask = ~uint160(0) << (hookPermissionCount);
 
-    function setUp() public override {
+    function setUp() public virtual override {
         underlyingAsset = new MockERC20();
         underlyingVault = new MockERC4626(underlyingAsset);
         _underlying_ = address(underlyingVault);
@@ -31,7 +31,7 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
         _unlimitedAmount = false;
     }
 
-    function setUpVault(Init memory init) public override {
+    function setUpVault(Init memory init) public virtual override {
         // setup initial shares and assets for individual users
         for (uint256 i = 0; i < N; i++) {
             address user = init.user[i];
@@ -70,7 +70,7 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
         setUpYield(init);
     }
 
-    function setUpYield(Init memory init) public override {
+    function setUpYield(Init memory init) public virtual override {
         if (init.yield >= 0) {
             // gain
             uint256 gain = uint256(init.yield);
