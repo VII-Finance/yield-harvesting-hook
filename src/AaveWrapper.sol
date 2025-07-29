@@ -12,11 +12,13 @@ import {IAToken} from "@aave-v3-core/interfaces/IAToken.sol";
 import {DataTypes as AaveDataTypes} from "@aave-v3-core/protocol/libraries/types/DataTypes.sol";
 import {WadRayMath} from "@aave-v3-core/protocol/libraries/math/WadRayMath.sol";
 
+import {IVaultWrapper} from "src/interfaces/IVaultWrapper.sol";
+
 /**
  * @notice This wrapper is intended for use with Aave's monotonically increasing aTokens.
  * @dev Aave does not have bad debt socialization, so this wrapper will always remain solvent.
  */
-contract AaveWrapper is ERC4626Upgradeable {
+contract AaveWrapper is ERC4626Upgradeable, IVaultWrapper {
     uint256 constant AAVE_ACTIVE_MASK = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFFFFFFFFFF;
     uint256 constant AAVE_FROZEN_MASK = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFDFFFFFFFFFFFFFF;
     uint256 constant AAVE_PAUSED_MASK = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFFFFFFFFFFF;

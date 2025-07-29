@@ -8,13 +8,15 @@ import {
     ERC4626Upgradeable
 } from "lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
 
+import {IVaultWrapper} from "src/interfaces/IVaultWrapper.sol";
+
 /**
  * @notice This vault wrapper is intended for use with lending protocol vaults where the underlying vault share price monotonically increases.
  * @dev If the underlying vault share price drops, this vault may become insolvent. In cases of bad debt socialization within the lending protocol vaults, the share price can decrease.
  *      It is recommended to have an insurance fund capable of burning tokens to restore solvency if needed.
  *      No harvest operations will occur until the vault regains solvency.
  */
-contract ERC4626VaultWrapper is ERC4626Upgradeable {
+contract ERC4626VaultWrapper is ERC4626Upgradeable, IVaultWrapper {
     address public immutable yieldHarvestingHook;
 
     error NotYieldHarvester();
