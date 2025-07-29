@@ -19,6 +19,8 @@ import {IVaultWrapper} from "src/interfaces/IVaultWrapper.sol";
 contract ERC4626VaultWrapper is ERC4626Upgradeable, IVaultWrapper {
     address public immutable yieldHarvestingHook;
 
+    address public underlyingAsset;
+
     error NotYieldHarvester();
 
     constructor(address _yieldHarvestingHook) {
@@ -28,6 +30,7 @@ contract ERC4626VaultWrapper is ERC4626Upgradeable, IVaultWrapper {
     function initialize(address _underlyingVault, string memory _name, string memory _symbol) public initializer {
         __ERC20_init(_name, _symbol);
         __ERC4626_init(IERC20(_underlyingVault));
+        underlyingAsset = IERC4626(_underlyingVault).asset();
     }
 
     function totalAssets() public view override returns (uint256) {
