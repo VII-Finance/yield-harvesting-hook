@@ -30,6 +30,7 @@ import {Constants} from "@uniswap/v4-core/test/utils/Constants.sol";
 contract YieldHarvestingHookTest is Fuzzers, Test {
     using StateLibrary for PoolManager;
 
+    address aavePool = makeAddr("AavePool");
     PoolManager public poolManager;
     YieldHarvestingHook public yieldHarvestingHook;
     ERC4626VaultWrapperFactory public vaultWrappersFactory;
@@ -69,7 +70,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
         deployCodeTo("YieldHarvestingHook", abi.encode(poolManager), address(yieldHarvestingHook));
 
-        vaultWrappersFactory = new ERC4626VaultWrapperFactory(poolManager, address(yieldHarvestingHook));
+        vaultWrappersFactory = new ERC4626VaultWrapperFactory(poolManager, address(yieldHarvestingHook), aavePool);
 
         MockERC20 assetA = new MockERC20();
         MockERC4626 underlyingVaultA = new MockERC4626(assetA);
@@ -77,7 +78,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         MockERC20 assetB = new MockERC20();
         MockERC4626 underlyingVaultB = new MockERC4626(assetB);
         (ERC4626VaultWrapper vaultWrapperA, ERC4626VaultWrapper vaultWrapperB) = vaultWrappersFactory
-            .initializePoolForTwoVault(
+            .initializeVaultToVaultPool(
             3000, 60, IERC4626(address(underlyingVaultA)), IERC4626(address(underlyingVaultB)), Constants.SQRT_PRICE_1_1
         );
         // Compare vaultWrapper addresses and assign 0/1 based on which is lower
