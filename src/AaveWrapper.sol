@@ -38,6 +38,7 @@ contract AaveWrapper is ERC4626Upgradeable, IVaultWrapper {
     }
 
     function initialize(address _underlyingAToken, string memory _name, string memory _symbol) public initializer {
+        underlyingAsset = IERC20(IAToken(_underlyingAToken).UNDERLYING_ASSET_ADDRESS());
         __ERC20_init(_name, _symbol);
         __ERC4626_init(IERC20(_underlyingAToken));
     }
