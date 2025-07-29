@@ -10,7 +10,7 @@ import {BalanceDelta, BalanceDeltaLibrary} from "@uniswap/v4-core/src/types/Bala
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
 import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
-import {ERC4626VaultWrapper} from "src/ERC4626VaultWrapper.sol";
+import {IVaultWrapper} from "src/interfaces/IVaultWrapper.sol";
 
 contract YieldHarvestingHook is BaseHook {
     using StateLibrary for IPoolManager;
@@ -21,21 +21,21 @@ contract YieldHarvestingHook is BaseHook {
         uint128 liquidity = poolManager.getLiquidity(poolKey.toId());
 
         if (liquidity != 0) {
-            uint256 yield0 = _currencyToERC4626VaultWrapper(poolKey.currency0).pendingYield();
-            uint256 yield1 = _currencyToERC4626VaultWrapper(poolKey.currency1).pendingYield();
+            uint256 yield0 = _currencyToVaultWrapper(poolKey.currency0).pendingYield();
+            uint256 yield1 = _currencyToVaultWrapper(poolKey.currency1).pendingYield();
 
             if (yield0 != 0 || yield1 != 0) {
                 poolManager.donate(poolKey, yield0, yield1, "");
 
                 if (yield0 != 0) {
                     poolManager.sync(poolKey.currency0);
-                    _currencyToERC4626VaultWrapper(poolKey.currency0).harvest(address(poolManager));
+                    _currencyToVaultWrapper(poolKey.currency0).harvest(address(poolManager));
                     poolManager.settle();
                 }
 
                 if (yield1 != 0) {
                     poolManager.sync(poolKey.currency1);
-                    _currencyToERC4626VaultWrapper(poolKey.currency1).harvest(address(poolManager));
+                    _currencyToVaultWrapper(poolKey.currency1).harvest(address(poolManager));
                     poolManager.settle();
                 }
             }
@@ -90,7 +90,7 @@ contract YieldHarvestingHook is BaseHook {
         return (this.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
     }
 
-    function _currencyToERC4626VaultWrapper(Currency currency) internal pure returns (ERC4626VaultWrapper) {
-        return ERC4626VaultWrapper(Currency.unwrap(currency));
+    function _currencyToVaultWrapper(Currency currency) internal pure returns (IVaultWrapper) {
+        return IVaultWrapper(Currency.unwrap(currency));
     }
 }
