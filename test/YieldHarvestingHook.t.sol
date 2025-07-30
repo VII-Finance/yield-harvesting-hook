@@ -19,7 +19,7 @@ import {Fuzzers} from "lib/v4-periphery/lib/v4-core/src/test/Fuzzers.sol";
 
 import {YieldHarvestingHook} from "src/YieldHarvestingHook.sol";
 import {ERC4626VaultWrapperFactory} from "src/ERC4626VaultWrapperFactory.sol";
-import {ERC4626VaultWrapper} from "src/ERC4626VaultWrapper.sol";
+import {ERC4626VaultWrapper} from "src/VaultWrappers/ERC4626VaultWrapper.sol";
 import {MockERC4626} from "test/utils/MockERC4626.sol";
 import {MockERC20} from "test/utils/MockERC20.sol";
 import {FeeMath, PositionConfig} from "test/utils/libraries/FeeMath.sol";

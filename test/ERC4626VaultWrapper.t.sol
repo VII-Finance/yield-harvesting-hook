@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.26;
 
-import {ERC4626VaultWrapper} from "src/ERC4626VaultWrapper.sol";
+import {ERC4626VaultWrapper} from "src/VaultWrappers/ERC4626VaultWrapper.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {ERC4626} from "solmate/src/mixins/ERC4626.sol";
 import {ERC4626Test} from "erc4626-tests/ERC4626.test.sol";

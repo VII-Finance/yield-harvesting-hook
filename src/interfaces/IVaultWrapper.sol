@@ -4,6 +4,8 @@ pragma solidity ^0.8.26;
 interface IVaultWrapper {
     function yieldHarvestingHook() external view returns (address);
     function harvest(address poolManager) external returns (uint256 harvestedAssets, uint256 fees);
-
     function pendingYield() external view returns (uint256, uint256);
+    function totalPendingYield() external view returns (uint256);
+    function feeDivisor() external view returns (uint256);
+    function feeReceiver() external view returns (address);
 }
