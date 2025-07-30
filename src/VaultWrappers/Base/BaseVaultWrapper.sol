@@ -15,6 +15,7 @@ abstract contract BaseVaultWrapper is ERC4626Upgradeable, IVaultWrapper {
 
     uint256 public constant MIN_FEE_DIVISOR = 14; // Maximum fees 7.14%
 
+    address public underlyingAsset;
     uint256 public feeDivisor;
     address public feeReceiver;
 
