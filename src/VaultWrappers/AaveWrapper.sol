@@ -27,14 +27,12 @@ contract AaveWrapper is BaseVaultWrapper {
 
     IPool public immutable aavePool;
 
-    IERC20 public underlyingAsset;
-
     constructor(address _yieldHarvestingHook, address _aavePool) BaseVaultWrapper(_yieldHarvestingHook) {
         aavePool = IPool(_aavePool);
     }
 
     function initialize(address _underlyingAToken, string memory _name, string memory _symbol) public initializer {
-        underlyingAsset = IERC20(IAToken(_underlyingAToken).UNDERLYING_ASSET_ADDRESS());
+        underlyingAsset = IAToken(_underlyingAToken).UNDERLYING_ASSET_ADDRESS();
         __ERC20_init(_name, _symbol);
         __ERC4626_init(IERC20(_underlyingAToken));
     }
@@ -76,7 +74,7 @@ contract AaveWrapper is BaseVaultWrapper {
         // returns max uint256 value if supply cap is 0 (not capped)
         // returns supply cap - current amount supplied as max suppliable if there is a supply cap for this reserve
 
-        AaveDataTypes.ReserveData memory reserveData = aavePool.getReserveData(address(underlyingAsset));
+        AaveDataTypes.ReserveData memory reserveData = aavePool.getReserveData(underlyingAsset);
 
         uint256 reserveConfigMap = reserveData.configuration.data;
         uint256 supplyCap = (reserveConfigMap & ~AAVE_SUPPLY_CAP_MASK) >> AAVE_SUPPLY_CAP_BIT_POSITION;
@@ -105,14 +103,14 @@ contract AaveWrapper is BaseVaultWrapper {
         // returns 0 if reserve is not active, or paused
         // otherwise, returns available liquidity
 
-        AaveDataTypes.ReserveData memory reserveData = aavePool.getReserveData(address(underlyingAsset));
+        AaveDataTypes.ReserveData memory reserveData = aavePool.getReserveData(underlyingAsset);
 
         uint256 reserveConfigMap = reserveData.configuration.data;
 
         if ((reserveConfigMap & ~AAVE_ACTIVE_MASK == 0) || (reserveConfigMap & ~AAVE_PAUSED_MASK != 0)) {
             return 0;
         } else {
-            return underlyingAsset.balanceOf(asset());
+            return IERC20(underlyingAsset).balanceOf(asset());
         }
     }
 

@@ -57,7 +57,9 @@ contract AaveWrapperTest is Test {
         assertEq(aaveWrapper.maxWithdraw(address(this)), 1e19);
 
         //if the balance is greater than available in aave, it should return the available amount
-        deal(address(aaveWrapper), address(this), aaveWrapper.underlyingAsset().balanceOf(address(aToken)) + 1);
-        assertEq(aaveWrapper.maxWithdraw(address(this)), aaveWrapper.underlyingAsset().balanceOf(address(aToken)));
+        deal(address(aaveWrapper), address(this), ERC20(aaveWrapper.underlyingAsset()).balanceOf(address(aToken)) + 1);
+        assertEq(
+            aaveWrapper.maxWithdraw(address(this)), ERC20(aaveWrapper.underlyingAsset()).balanceOf(address(aToken))
+        );
     }
 }

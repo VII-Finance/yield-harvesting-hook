@@ -17,8 +17,6 @@ import {BaseVaultWrapper} from "src/VaultWrappers/Base/BaseVaultWrapper.sol";
  *      No harvest operations will occur until the vault regains solvency.
  */
 contract ERC4626VaultWrapper is BaseVaultWrapper {
-    address public underlyingAsset;
-
     constructor(address _yieldHarvestingHook) BaseVaultWrapper(_yieldHarvestingHook) {}
 
     function initialize(address _underlyingVault, string memory _name, string memory _symbol) public initializer {

@@ -12,7 +12,6 @@ import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {AaveWrapper} from "src/VaultWrappers/AaveWrapper.sol";
 import {Ownable} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-import {console} from "forge-std/console.sol";
 
 contract ERC4626VaultWrapperFactory is Ownable {
     IPoolManager public immutable poolManager;
