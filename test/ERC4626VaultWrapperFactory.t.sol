@@ -3,7 +3,7 @@ pragma solidity ^0.8.26;
 
 import {Test, console} from "forge-std/Test.sol";
 import {ERC4626VaultWrapperFactory} from "src/ERC4626VaultWrapperFactory.sol";
-import {ERC4626VaultWrapper} from "src/ERC4626VaultWrapper.sol";
+import {BaseVaultWrapper, ERC4626VaultWrapper} from "src/ERC4626VaultWrapper.sol";
 import {AaveWrapper} from "src/AaveWrapper.sol";
 import {IERC4626} from
     "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
@@ -60,6 +60,7 @@ contract ERC4626VaultWrapperFactoryTest is Test {
     address poolManagerOwner = makeAddr("poolManagerOwner");
     YieldHarvestingHook yieldHarvestingHook;
     address aavePool = makeAddr("aavePool");
+    address factoryOwner = makeAddr("factoryOwner");
 
     address tokenA;
     address tokenB;
@@ -100,7 +101,7 @@ contract ERC4626VaultWrapperFactoryTest is Test {
         aTokenA = new MockAToken();
         aTokenB = new MockAToken();
 
-        factory = new ERC4626VaultWrapperFactory(poolManager, address(yieldHarvestingHook), aavePool);
+        factory = new ERC4626VaultWrapperFactory(factoryOwner, poolManager, address(yieldHarvestingHook), aavePool);
     }
 
     function isPoolInitialized(PoolKey memory poolKey) internal view returns (bool) {
@@ -284,6 +285,40 @@ contract ERC4626VaultWrapperFactoryTest is Test {
 
         assertEq(address(vaultWrapper), predictedVault, "Vault wrapper prediction should match");
         assertEq(address(aaveWrapper), predictedAave, "Aave wrapper prediction should match");
+    }
+
+    function testSetFeeParameters() public {
+        (AaveWrapper aaveWrapper, ERC4626VaultWrapper vaultWrapper) = factory.initializeAaveToVaultPool(
+            FEE, TICK_SPACING, address(aTokenA), IERC4626(address(vaultA)), SQRT_PRICE_X96
+        );
+
+        assertEq(aaveWrapper.feeDivisor(), 0);
+        assertEq(aaveWrapper.feeReceiver(), address(0));
+        assertEq(vaultWrapper.feeDivisor(), 0);
+        assertEq(vaultWrapper.feeReceiver(), address(0));
+
+        vm.expectRevert(BaseVaultWrapper.NotFactory.selector);
+        aaveWrapper.setFeeParameters(20, makeAddr("feeReceiver"));
+
+        vm.expectRevert();
+        factory.setVaultWrapperFees(address(aaveWrapper), 20, makeAddr("feeReceiver"));
+
+        //setting fee divisor less than 14 should fail
+        //this means the max fees that owner can take is 7.14%
+        //and they can only get fees 1/14 = 7.14% 1/15 = 6.67%, 1/16 = 6.25% etc.
+        vm.expectRevert(BaseVaultWrapper.InvalidFeeDivisor.selector);
+        vm.startPrank(factoryOwner);
+        factory.setVaultWrapperFees(address(aaveWrapper), 13, makeAddr("feeReceiver"));
+
+        factory.setVaultWrapperFees(address(aaveWrapper), 14, makeAddr("feeReceiver"));
+        assertEq(aaveWrapper.feeDivisor(), 14);
+        assertEq(aaveWrapper.feeReceiver(), makeAddr("feeReceiver"));
+
+        factory.setVaultWrapperFees(address(vaultWrapper), 14, makeAddr("feeReceiver"));
+        assertEq(vaultWrapper.feeDivisor(), 14);
+        assertEq(vaultWrapper.feeReceiver(), makeAddr("feeReceiver"));
+
+        vm.stopPrank();
     }
 
     function _generateSalt(address token0, address token1, uint24 fee, int24 tickSpacing)

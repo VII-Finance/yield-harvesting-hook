@@ -21,8 +21,8 @@ contract YieldHarvestingHook is BaseHook {
         uint128 liquidity = poolManager.getLiquidity(poolKey.toId());
 
         if (liquidity != 0) {
-            uint256 yield0 = _currencyToVaultWrapper(poolKey.currency0).pendingYield();
-            uint256 yield1 = _currencyToVaultWrapper(poolKey.currency1).pendingYield();
+            (uint256 yield0,) = _currencyToVaultWrapper(poolKey.currency0).pendingYield();
+            (uint256 yield1,) = _currencyToVaultWrapper(poolKey.currency1).pendingYield();
 
             if (yield0 != 0 || yield1 != 0) {
                 poolManager.donate(poolKey, yield0, yield1, "");
