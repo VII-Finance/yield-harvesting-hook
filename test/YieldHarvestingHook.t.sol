@@ -31,6 +31,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
     using StateLibrary for PoolManager;
 
     address aavePool = makeAddr("AavePool");
+    address vaultFactoryOwner = makeAddr("VaultFactoryOwner");
     PoolManager public poolManager;
     YieldHarvestingHook public yieldHarvestingHook;
     ERC4626VaultWrapperFactory public vaultWrappersFactory;
@@ -70,7 +71,8 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
         deployCodeTo("YieldHarvestingHook", abi.encode(poolManager), address(yieldHarvestingHook));
 
-        vaultWrappersFactory = new ERC4626VaultWrapperFactory(poolManager, address(yieldHarvestingHook), aavePool);
+        vaultWrappersFactory =
+            new ERC4626VaultWrapperFactory(vaultFactoryOwner, poolManager, address(yieldHarvestingHook), aavePool);
 
         MockERC20 assetA = new MockERC20();
         MockERC4626 underlyingVaultA = new MockERC4626(assetA);

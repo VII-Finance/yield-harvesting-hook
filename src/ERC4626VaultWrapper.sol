@@ -8,7 +8,7 @@ import {
     ERC4626Upgradeable
 } from "lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
 
-import {IVaultWrapper} from "src/interfaces/IVaultWrapper.sol";
+import {BaseVaultWrapper} from "src/BaseVaultWrapper.sol";
 
 /**
  * @notice This vault wrapper is intended for use with lending protocol vaults where the underlying vault share price monotonically increases.
@@ -16,16 +16,10 @@ import {IVaultWrapper} from "src/interfaces/IVaultWrapper.sol";
  *      It is recommended to have an insurance fund capable of burning tokens to restore solvency if needed.
  *      No harvest operations will occur until the vault regains solvency.
  */
-contract ERC4626VaultWrapper is ERC4626Upgradeable, IVaultWrapper {
-    address public immutable yieldHarvestingHook;
-
+contract ERC4626VaultWrapper is BaseVaultWrapper {
     address public underlyingAsset;
 
-    error NotYieldHarvester();
-
-    constructor(address _yieldHarvestingHook) {
-        yieldHarvestingHook = _yieldHarvestingHook;
-    }
+    constructor(address _yieldHarvestingHook) BaseVaultWrapper(_yieldHarvestingHook) {}
 
     function initialize(address _underlyingVault, string memory _name, string memory _symbol) public initializer {
         __ERC20_init(_name, _symbol);
@@ -81,22 +75,7 @@ contract ERC4626VaultWrapper is ERC4626Upgradeable, IVaultWrapper {
         return Math.min(underlyingVault().maxWithdraw(address(this)), balanceOf(owner));
     }
 
-    function pendingYield() public view returns (uint256) {
-        uint256 maxWithdrawableAssets = underlyingVault().maxWithdraw(address(this));
-        uint256 currentSupply = totalSupply();
-        if (maxWithdrawableAssets > currentSupply) {
-            return maxWithdrawableAssets - currentSupply;
-        }
-        return 0;
-    }
-
-    function harvest(address to) external returns (uint256 harvestedAssets) {
-        if (msg.sender != yieldHarvestingHook) revert NotYieldHarvester();
-        harvestedAssets = pendingYield();
-        if (harvestedAssets > 0) _mint(to, harvestedAssets);
-    }
-
-    function burn(uint256 amount) external {
-        _burn(msg.sender, amount);
+    function _maxWithdrawableAssets() internal view override returns (uint256) {
+        return underlyingVault().maxWithdraw(address(this));
     }
 }

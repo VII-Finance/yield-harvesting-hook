@@ -12,28 +12,24 @@ import {IAToken} from "@aave-v3-core/interfaces/IAToken.sol";
 import {DataTypes as AaveDataTypes} from "@aave-v3-core/protocol/libraries/types/DataTypes.sol";
 import {WadRayMath} from "@aave-v3-core/protocol/libraries/math/WadRayMath.sol";
 
-import {IVaultWrapper} from "src/interfaces/IVaultWrapper.sol";
+import {BaseVaultWrapper} from "src/BaseVaultWrapper.sol";
 
 /**
  * @notice This wrapper is intended for use with Aave's monotonically increasing aTokens.
  * @dev Aave does not have bad debt socialization, so this wrapper will always remain solvent.
  */
-contract AaveWrapper is ERC4626Upgradeable, IVaultWrapper {
+contract AaveWrapper is BaseVaultWrapper {
     uint256 constant AAVE_ACTIVE_MASK = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFFFFFFFFFF;
     uint256 constant AAVE_FROZEN_MASK = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFDFFFFFFFFFFFFFF;
     uint256 constant AAVE_PAUSED_MASK = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFFFFFFFFFFF;
     uint256 constant AAVE_SUPPLY_CAP_MASK = 0xFFFFFFFFFFFFFFFFFFFFFFFFFF000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
     uint256 constant AAVE_SUPPLY_CAP_BIT_POSITION = 116;
 
-    address public immutable yieldHarvestingHook;
     IPool public immutable aavePool;
 
     IERC20 public underlyingAsset;
 
-    error NotYieldHarvester();
-
-    constructor(address _yieldHarvestingHook, address _aavePool) {
-        yieldHarvestingHook = _yieldHarvestingHook;
+    constructor(address _yieldHarvestingHook, address _aavePool) BaseVaultWrapper(_yieldHarvestingHook) {
         aavePool = IPool(_aavePool);
     }
 
@@ -120,24 +116,7 @@ contract AaveWrapper is ERC4626Upgradeable, IVaultWrapper {
         }
     }
 
-    function pendingYield() public view returns (uint256) {
-        uint256 maxWithdrawableAssets =
-            Math.min(_maxAssetsWithdrawableFromAave(), underlyingAToken().balanceOf(address(this)));
-
-        uint256 currentSupply = totalSupply();
-        if (maxWithdrawableAssets > currentSupply) {
-            return maxWithdrawableAssets - currentSupply;
-        }
-        return 0;
-    }
-
-    function harvest(address to) external returns (uint256 harvestedAssets) {
-        if (msg.sender != yieldHarvestingHook) revert NotYieldHarvester();
-        harvestedAssets = pendingYield();
-        if (harvestedAssets > 0) _mint(to, harvestedAssets);
-    }
-
-    function burn(uint256 amount) external {
-        _burn(msg.sender, amount);
+    function _maxWithdrawableAssets() internal view override returns (uint256) {
+        return Math.min(_maxAssetsWithdrawableFromAave(), underlyingAToken().balanceOf(address(this)));
     }
 }

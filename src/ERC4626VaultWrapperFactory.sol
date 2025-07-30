@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {ERC4626VaultWrapper} from "src/ERC4626VaultWrapper.sol";
+import {BaseVaultWrapper} from "src/BaseVaultWrapper.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IERC4626} from
     "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
@@ -10,16 +11,19 @@ import {Clones} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-co
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {AaveWrapper} from "src/AaveWrapper.sol";
+import {Ownable} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {console} from "forge-std/console.sol";
 
-contract ERC4626VaultWrapperFactory {
+contract ERC4626VaultWrapperFactory is Ownable {
     IPoolManager public immutable poolManager;
     address public immutable yieldHarvestingHook;
     address public immutable vaultWrapperImplementation;
     address public immutable aaveWrapperImplementation;
     address public immutable aavePool;
 
-    constructor(IPoolManager _manager, address _yieldHarvestingHook, address _aavePool) {
+    constructor(address _owner, IPoolManager _manager, address _yieldHarvestingHook, address _aavePool)
+        Ownable(_owner)
+    {
         poolManager = _manager;
         yieldHarvestingHook = _yieldHarvestingHook;
         aavePool = _aavePool;
@@ -149,5 +153,9 @@ contract ERC4626VaultWrapperFactory {
         aaveWrapperB = _deployAaveWrapper(aTokenB, _generateSalt(aTokenB, aTokenA, fee, tickSpacing));
 
         _initializePool(address(aaveWrapperA), address(aaveWrapperB), fee, tickSpacing, sqrtPriceX96);
+    }
+
+    function setVaultWrapperFees(address vaultWrapper, uint256 feeDivisor, address feeReceiver) external onlyOwner {
+        BaseVaultWrapper(vaultWrapper).setFeeParameters(feeDivisor, feeReceiver);
     }
 }
