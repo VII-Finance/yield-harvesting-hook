@@ -12,7 +12,7 @@ import {IAToken} from "@aave-v3-core/interfaces/IAToken.sol";
 import {DataTypes as AaveDataTypes} from "@aave-v3-core/protocol/libraries/types/DataTypes.sol";
 import {WadRayMath} from "@aave-v3-core/protocol/libraries/math/WadRayMath.sol";
 
-import {BaseVaultWrapper} from "src/BaseVaultWrapper.sol";
+import {BaseVaultWrapper} from "src/VaultWrappers/Base/BaseVaultWrapper.sol";
 
 /**
  * @notice This wrapper is intended for use with Aave's monotonically increasing aTokens.

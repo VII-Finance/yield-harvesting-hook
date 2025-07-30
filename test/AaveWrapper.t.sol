@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.26;
 
-import {AaveWrapper} from "src/AaveWrapper.sol";
+import {AaveWrapper} from "src/VaultWrappers/AaveWrapper.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {Test} from "forge-std/Test.sol";
 

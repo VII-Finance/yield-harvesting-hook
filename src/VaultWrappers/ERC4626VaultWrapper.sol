@@ -8,7 +8,7 @@ import {
     ERC4626Upgradeable
 } from "lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
 
-import {BaseVaultWrapper} from "src/BaseVaultWrapper.sol";
+import {BaseVaultWrapper} from "src/VaultWrappers/Base/BaseVaultWrapper.sol";
 
 /**
  * @notice This vault wrapper is intended for use with lending protocol vaults where the underlying vault share price monotonically increases.

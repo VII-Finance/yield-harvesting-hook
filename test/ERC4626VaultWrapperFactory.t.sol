@@ -3,8 +3,8 @@ pragma solidity ^0.8.26;
 
 import {Test, console} from "forge-std/Test.sol";
 import {ERC4626VaultWrapperFactory} from "src/ERC4626VaultWrapperFactory.sol";
-import {BaseVaultWrapper, ERC4626VaultWrapper} from "src/ERC4626VaultWrapper.sol";
-import {AaveWrapper} from "src/AaveWrapper.sol";
+import {BaseVaultWrapper, ERC4626VaultWrapper} from "src/VaultWrappers/ERC4626VaultWrapper.sol";
+import {AaveWrapper} from "src/VaultWrappers/AaveWrapper.sol";
 import {IERC4626} from
     "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {ERC4626VaultWrapperTest} from "test/ERC4626VaultWrapper.t.sol";
-import {AaveWrapper} from "src/AaveWrapper.sol";
+import {AaveWrapper} from "src/VaultWrappers/AaveWrapper.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 
 contract MockAaveWrapper is AaveWrapper {

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.26;
 
-import {ERC4626VaultWrapper} from "src/ERC4626VaultWrapper.sol";
-import {BaseVaultWrapper} from "src/BaseVaultWrapper.sol";
+import {ERC4626VaultWrapper} from "src/VaultWrappers/ERC4626VaultWrapper.sol";
+import {BaseVaultWrapper} from "src/VaultWrappers/Base/BaseVaultWrapper.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IERC4626} from
     "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
@@ -10,7 +10,7 @@ import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {Clones} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/Clones.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
-import {AaveWrapper} from "src/AaveWrapper.sol";
+import {AaveWrapper} from "src/VaultWrappers/AaveWrapper.sol";
 import {Ownable} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {console} from "forge-std/console.sol";
 

@@ -9,9 +9,6 @@ import {
 
 import {IVaultWrapper} from "src/interfaces/IVaultWrapper.sol";
 
-/**
- * @notice Abstract base contract for vault wrappers that provides common yield harvesting functionality
- */
 abstract contract BaseVaultWrapper is ERC4626Upgradeable, IVaultWrapper {
     address public immutable yieldHarvestingHook;
     address public immutable factory;
@@ -25,18 +22,22 @@ abstract contract BaseVaultWrapper is ERC4626Upgradeable, IVaultWrapper {
     error InvalidFeeDivisor();
     error NotFactory();
 
+    event FeeParametersSet(uint256 feeDivisor, address feeReceiver);
+
     constructor(address _yieldHarvestingHook) {
         yieldHarvestingHook = _yieldHarvestingHook;
-        factory = msg.sender;
+        factory = _msgSender();
     }
 
     function _maxWithdrawableAssets() internal view virtual returns (uint256);
 
     function setFeeParameters(uint256 _feeDivisor, address _feeReceiver) external {
-        if (msg.sender != factory) revert NotFactory();
+        if (_msgSender() != factory) revert NotFactory();
         if (_feeDivisor != 0 && _feeDivisor < MIN_FEE_DIVISOR) revert InvalidFeeDivisor();
         feeDivisor = _feeDivisor;
         feeReceiver = _feeReceiver;
+
+        emit FeeParametersSet(_feeDivisor, _feeReceiver);
     }
 
     function pendingYield() public view returns (uint256, uint256) {
@@ -65,14 +66,11 @@ abstract contract BaseVaultWrapper is ERC4626Upgradeable, IVaultWrapper {
     }
 
     function harvest(address to) external returns (uint256 harvestedAssets, uint256 fees) {
-        if (msg.sender != yieldHarvestingHook) revert NotYieldHarvester();
-
+        if (_msgSender() != yieldHarvestingHook) revert NotYieldHarvester();
         (harvestedAssets, fees) = pendingYield();
-
-        if (fees > 0 && feeReceiver != address(0)) {
+        if (fees > 0) {
             _mint(feeReceiver, fees);
         }
-
         if (harvestedAssets > 0) {
             _mint(to, harvestedAssets);
         }
