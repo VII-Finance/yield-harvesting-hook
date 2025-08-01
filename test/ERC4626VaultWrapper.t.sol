@@ -8,10 +8,12 @@ import {ERC4626Test} from "erc4626-tests/ERC4626.test.sol";
 import {MockERC20} from "test/utils/MockERC20.sol";
 import {MockERC4626} from "test/utils/MockERC4626.sol";
 import {FullMath} from "lib/v4-periphery/lib/v4-core/src/libraries/FullMath.sol";
+import {LibClone} from "lib/solady/src/utils/LibClone.sol";
 
 contract ERC4626VaultWrapperTest is ERC4626Test {
     address harvester = makeAddr("harvester");
     address harvestReceiver = makeAddr("harvestReceiver");
+    address vaultImplementation = address(new ERC4626VaultWrapper());
     MockERC4626 underlyingVault;
     MockERC20 underlyingAsset;
 
@@ -23,8 +25,11 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
         underlyingVault = new MockERC4626(underlyingAsset);
         _underlying_ = address(underlyingVault);
 
-        _vault_ = address(new ERC4626VaultWrapper(harvester));
-        ERC4626VaultWrapper(_vault_).initialize(address(underlyingVault), "Vault Wrapper", "VW");
+        _vault_ = LibClone.cloneDeterministic(
+            vaultImplementation,
+            abi.encodePacked(address(this), harvester, address(underlyingVault)),
+            keccak256(abi.encodePacked(address(underlyingVault)))
+        );
 
         _delta_ = 0;
         _vaultMayBeEmpty = false;

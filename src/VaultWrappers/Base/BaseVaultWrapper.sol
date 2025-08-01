@@ -3,21 +3,30 @@ pragma solidity ^0.8.26;
 
 import {
     IERC20,
+    ERC20,
     Math,
-    ERC4626Upgradeable
-} from "lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
+    ERC4626,
+    IERC20Metadata
+} from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/ERC4626.sol";
+import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {LibClone} from "lib/solady/src/utils/LibClone.sol";
 
 import {IVaultWrapper} from "src/interfaces/IVaultWrapper.sol";
 
-abstract contract BaseVaultWrapper is ERC4626Upgradeable, IVaultWrapper {
-    address public immutable yieldHarvestingHook;
-    address public immutable factory;
+abstract contract BaseVaultWrapper is ERC4626, IVaultWrapper {
+    using SafeERC20 for IERC20;
 
     uint256 public constant MIN_FEE_DIVISOR = 14; // Maximum fees 7.14%
 
-    address public underlyingAsset;
+    uint256 private constant ADDRESS_LENGTH = 20;
+    uint256 private constant FACTORY_OFFSET = 0;
+    uint256 private constant YIELD_HOOK_OFFSET = 1;
+    uint256 private constant UNDERLYING_VAULT_OFFSET = 2;
+
     uint256 public feeDivisor;
     address public feeReceiver;
+
+    using LibClone for address;
 
     error NotYieldHarvester();
     error InvalidFeeDivisor();
@@ -25,15 +34,46 @@ abstract contract BaseVaultWrapper is ERC4626Upgradeable, IVaultWrapper {
 
     event FeeParametersSet(uint256 feeDivisor, address feeReceiver);
 
-    constructor(address _yieldHarvestingHook) {
-        yieldHarvestingHook = _yieldHarvestingHook;
-        factory = _msgSender();
+    constructor() ERC4626(IERC20(address(0))) ERC20("VII Finance - Vault Wrapper Implementation", "VII-VWIMP") {}
+
+    function getFactory() public view returns (address) {
+        return getImmutableArgAddress(FACTORY_OFFSET);
+    }
+
+    function getYieldHarvestingHook() public view returns (address) {
+        return getImmutableArgAddress(YIELD_HOOK_OFFSET);
+    }
+
+    function getUnderlyingVault() public view returns (address) {
+        return getImmutableArgAddress(UNDERLYING_VAULT_OFFSET);
+    }
+
+    function getImmutableArgAddress(uint256 argOffset) internal view returns (address) {
+        uint256 start = argOffset * ADDRESS_LENGTH;
+        uint256 end = start + ADDRESS_LENGTH;
+        return address(bytes20(LibClone.argsOnClone(address(this), start, end)));
     }
 
     function _maxWithdrawableAssets() internal view virtual returns (uint256);
 
+    function name() public view override(ERC20, IERC20Metadata) returns (string memory) {
+        return string(abi.encodePacked("VII Finance Wrapped ", ERC20(getUnderlyingVault()).name()));
+    }
+
+    function symbol() public view override(ERC20, IERC20Metadata) returns (string memory) {
+        return string(abi.encodePacked("VII-", ERC20(getUnderlyingVault()).symbol()));
+    }
+
+    function decimals() public view override returns (uint8) {
+        return ERC20(getUnderlyingVault()).decimals();
+    }
+
+    function asset() public view override returns (address) {
+        return getUnderlyingVault();
+    }
+
     function setFeeParameters(uint256 _feeDivisor, address _feeReceiver) external {
-        if (_msgSender() != factory) revert NotFactory();
+        if (_msgSender() != getFactory()) revert NotFactory();
         if (_feeDivisor != 0 && _feeDivisor < MIN_FEE_DIVISOR) revert InvalidFeeDivisor();
         feeDivisor = _feeDivisor;
         feeReceiver = _feeReceiver;
@@ -67,7 +107,7 @@ abstract contract BaseVaultWrapper is ERC4626Upgradeable, IVaultWrapper {
     }
 
     function harvest(address to) external returns (uint256 harvestedAssets, uint256 fees) {
-        if (_msgSender() != yieldHarvestingHook) revert NotYieldHarvester();
+        if (_msgSender() != getYieldHarvestingHook()) revert NotYieldHarvester();
         (harvestedAssets, fees) = pendingYield();
         if (fees > 0) {
             _mint(feeReceiver, fees);

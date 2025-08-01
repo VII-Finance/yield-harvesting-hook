@@ -10,8 +10,10 @@ import {IAToken} from "@aave-v3-core/interfaces/IAToken.sol";
 
 import {IPoolDataProvider} from "@aave-v3-core/interfaces/IPoolDataProvider.sol";
 import {IPoolAddressesProvider} from "@aave-v3-core/interfaces/IPoolAddressesProvider.sol";
+import {LibClone} from "lib/solady/src/utils/LibClone.sol";
 
 contract AaveWrapperTest is Test {
+    address aaveWrapperImplementation;
     address yieldHarvestingHook = makeAddr("YieldHarvestingHook");
     AaveWrapper aaveWrapper;
     IPool aavePool;
@@ -23,13 +25,23 @@ contract AaveWrapperTest is Test {
         vm.createSelectFork(fork_url, 22473612);
 
         aavePool = IPool(addressProvider.getPool());
+        aaveWrapperImplementation = address(new AaveWrapper());
+    }
+
+    function _deployAaveWrapper(IAToken aToken) internal returns (AaveWrapper) {
+        return AaveWrapper(
+            LibClone.cloneDeterministic(
+                aaveWrapperImplementation,
+                abi.encodePacked(address(this), yieldHarvestingHook, address(aToken), address(aavePool)),
+                keccak256(abi.encodePacked(address(aToken)))
+            )
+        );
     }
 
     function testMaxDepositWhenActive() public {
         IAToken aToken = IAToken(0x0B925eD163218f6662a35e0f0371Ac234f9E9371); // wstETH aToken
 
-        aaveWrapper = new AaveWrapper(yieldHarvestingHook, address(aavePool));
-        aaveWrapper.initialize(address(aToken), "Aave Wrapper", "aAAVE");
+        aaveWrapper = _deployAaveWrapper(aToken);
 
         assertEq(
             aaveWrapper.maxDeposit(address(this)),
@@ -40,26 +52,27 @@ contract AaveWrapperTest is Test {
 
     function testMaxDepositWhenInactive() public {
         IAToken aToken = IAToken(0x82F9c5ad306BBa1AD0De49bB5FA6F01bf61085ef); // FXS aToken (this token is frozen at the fork block)
-
-        aaveWrapper = new AaveWrapper(yieldHarvestingHook, address(aavePool));
-        aaveWrapper.initialize(address(aToken), "Aave Wrapper", "aAAVE");
-
+        aaveWrapper = _deployAaveWrapper(aToken);
         assertEq(aaveWrapper.maxDeposit(address(this)), 0, "Max deposit should equal 0 when aToken is inactive");
     }
 
     function testMaxWithdraw() public {
         IAToken aToken = IAToken(0x0B925eD163218f6662a35e0f0371Ac234f9E9371); // wstETH aToken
 
-        aaveWrapper = new AaveWrapper(yieldHarvestingHook, address(aavePool));
-        aaveWrapper.initialize(address(aToken), "Aave Wrapper", "aAAVE");
+        aaveWrapper = _deployAaveWrapper(aToken);
 
         deal(address(aaveWrapper), address(this), 1e19);
         assertEq(aaveWrapper.maxWithdraw(address(this)), 1e19);
 
         //if the balance is greater than available in aave, it should return the available amount
-        deal(address(aaveWrapper), address(this), ERC20(aaveWrapper.underlyingAsset()).balanceOf(address(aToken)) + 1);
+        deal(
+            address(aaveWrapper),
+            address(this),
+            ERC20(IAToken(aaveWrapper.getUnderlyingVault()).UNDERLYING_ASSET_ADDRESS()).balanceOf(address(aToken)) + 1
+        );
         assertEq(
-            aaveWrapper.maxWithdraw(address(this)), ERC20(aaveWrapper.underlyingAsset()).balanceOf(address(aToken))
+            aaveWrapper.maxWithdraw(address(this)),
+            ERC20(IAToken(aaveWrapper.getUnderlyingVault()).UNDERLYING_ASSET_ADDRESS()).balanceOf(address(aToken))
         );
     }
 }
