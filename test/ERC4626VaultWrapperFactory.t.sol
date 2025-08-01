@@ -5,18 +5,17 @@ import {Test, console} from "forge-std/Test.sol";
 import {ERC4626VaultWrapperFactory} from "src/ERC4626VaultWrapperFactory.sol";
 import {BaseVaultWrapper, ERC4626VaultWrapper} from "src/VaultWrappers/ERC4626VaultWrapper.sol";
 import {AaveWrapper} from "src/VaultWrappers/AaveWrapper.sol";
-import {IERC4626} from
-    "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
+import {IERC4626} from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
-import {Clones} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/Clones.sol";
 import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 import {PoolManager} from "@uniswap/v4-core/src/PoolManager.sol";
 import {YieldHarvestingHook} from "src/YieldHarvestingHook.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
+import {LibClone} from "lib/solady/src/utils/LibClone.sol";
 
 contract MockAToken {
     function UNDERLYING_ASSET_ADDRESS() external pure returns (address) {
@@ -138,8 +137,6 @@ contract ERC4626VaultWrapperFactoryTest is Test {
     }
 
     function testInitializeVaultToVaultPool() public {
-        vm.expectEmit(true, true, true, true);
-
         (ERC4626VaultWrapper wrapperA, ERC4626VaultWrapper wrapperB) = factory.initializeVaultToVaultPool(
             FEE, TICK_SPACING, IERC4626(address(vaultA)), IERC4626(address(vaultB)), SQRT_PRICE_X96
         );
@@ -244,8 +241,12 @@ contract ERC4626VaultWrapperFactoryTest is Test {
     function testPredictVaultWrapperAddress() public {
         bytes32 salt = _generateSalt(address(vaultA), address(vaultB), FEE, TICK_SPACING);
 
-        address predicted =
-            Clones.predictDeterministicAddress(factory.vaultWrapperImplementation(), salt, address(factory));
+        address predicted = LibClone.predictDeterministicAddress(
+            factory.vaultWrapperImplementation(),
+            _generateImmutableArgsForVaultWrapper(address(vaultA)),
+            salt,
+            address(factory)
+        );
 
         (ERC4626VaultWrapper wrapperA,) = factory.initializeVaultToVaultPool(
             FEE, TICK_SPACING, IERC4626(address(vaultA)), IERC4626(address(vaultB)), SQRT_PRICE_X96
@@ -257,8 +258,12 @@ contract ERC4626VaultWrapperFactoryTest is Test {
     function testPredictAaveWrapperAddress() public {
         bytes32 salt = _generateSalt(address(aTokenA), address(vaultA), FEE, TICK_SPACING);
 
-        address predicted =
-            Clones.predictDeterministicAddress(factory.aaveWrapperImplementation(), salt, address(factory));
+        address predicted = LibClone.predictDeterministicAddress(
+            factory.aaveWrapperImplementation(),
+            _generateImmutableArgsForAaveWrapper(address(aTokenA)),
+            salt,
+            address(factory)
+        );
 
         (AaveWrapper aaveWrapper,) = factory.initializeAaveToVaultPool(
             FEE, TICK_SPACING, address(aTokenA), IERC4626(address(vaultA)), SQRT_PRICE_X96
@@ -269,12 +274,20 @@ contract ERC4626VaultWrapperFactoryTest is Test {
 
     function testPredictMultipleWrapperAddresses() public {
         bytes32 vaultSalt = _generateSalt(address(vaultA), address(tokenA), FEE, TICK_SPACING);
-        address predictedVault =
-            Clones.predictDeterministicAddress(factory.vaultWrapperImplementation(), vaultSalt, address(factory));
+        address predictedVault = LibClone.predictDeterministicAddress(
+            factory.vaultWrapperImplementation(),
+            _generateImmutableArgsForVaultWrapper(address(vaultA)),
+            vaultSalt,
+            address(factory)
+        );
 
         bytes32 aaveSalt = _generateSalt(address(aTokenA), address(tokenB), FEE, TICK_SPACING);
-        address predictedAave =
-            Clones.predictDeterministicAddress(factory.aaveWrapperImplementation(), aaveSalt, address(factory));
+        address predictedAave = LibClone.predictDeterministicAddress(
+            factory.aaveWrapperImplementation(),
+            _generateImmutableArgsForAaveWrapper(address(aTokenA)),
+            aaveSalt,
+            address(factory)
+        );
 
         ERC4626VaultWrapper vaultWrapper = factory.initializeVaultToTokenPool(
             FEE, TICK_SPACING, IERC4626(address(vaultA)), address(tokenA), SQRT_PRICE_X96
@@ -327,6 +340,14 @@ contract ERC4626VaultWrapperFactoryTest is Test {
         returns (bytes32)
     {
         return keccak256(abi.encodePacked(token0, token1, fee, tickSpacing));
+    }
+
+    function _generateImmutableArgsForVaultWrapper(address vault) internal view returns (bytes memory) {
+        return abi.encodePacked(address(factory), address(yieldHarvestingHook), vault);
+    }
+
+    function _generateImmutableArgsForAaveWrapper(address aToken) internal view returns (bytes memory) {
+        return abi.encodePacked(address(factory), address(yieldHarvestingHook), aToken, aavePool);
     }
 
     function _buildPoolKey(address token0, address token1) internal view returns (PoolKey memory) {

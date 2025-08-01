@@ -4,14 +4,13 @@ pragma solidity ^0.8.26;
 import {ERC4626VaultWrapper} from "src/VaultWrappers/ERC4626VaultWrapper.sol";
 import {BaseVaultWrapper} from "src/VaultWrappers/Base/BaseVaultWrapper.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
-import {IERC4626} from
-    "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
+import {IERC4626} from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
-import {Clones} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/Clones.sol";
+import {LibClone} from "lib/solady/src/utils/LibClone.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {AaveWrapper} from "src/VaultWrappers/AaveWrapper.sol";
-import {Ownable} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 contract ERC4626VaultWrapperFactory is Ownable {
     IPoolManager public immutable poolManager;
@@ -26,8 +25,8 @@ contract ERC4626VaultWrapperFactory is Ownable {
         poolManager = _manager;
         yieldHarvestingHook = _yieldHarvestingHook;
         aavePool = _aavePool;
-        vaultWrapperImplementation = address(new ERC4626VaultWrapper(_yieldHarvestingHook));
-        aaveWrapperImplementation = address(new AaveWrapper(_yieldHarvestingHook, _aavePool));
+        vaultWrapperImplementation = address(new ERC4626VaultWrapper());
+        aaveWrapperImplementation = address(new AaveWrapper());
     }
 
     function getWrapperName(IERC4626 vault) public view returns (string memory) {
@@ -55,13 +54,19 @@ contract ERC4626VaultWrapperFactory is Ownable {
     }
 
     function _deployVaultWrapper(IERC4626 vault, bytes32 salt) internal returns (ERC4626VaultWrapper wrapper) {
-        wrapper = ERC4626VaultWrapper(Clones.cloneDeterministic(vaultWrapperImplementation, salt));
-        wrapper.initialize(address(vault), getWrapperName(vault), getWrapperSymbol(vault));
+        wrapper = ERC4626VaultWrapper(
+            LibClone.cloneDeterministic(
+                vaultWrapperImplementation, abi.encodePacked(address(this), yieldHarvestingHook, address(vault)), salt
+            )
+        );
     }
 
     function _deployAaveWrapper(address aToken, bytes32 salt) internal returns (AaveWrapper wrapper) {
-        wrapper = AaveWrapper(Clones.cloneDeterministic(aaveWrapperImplementation, salt));
-        wrapper.initialize(aToken, getAaveWrapperName(aToken), getAaveWrapperSymbol(aToken));
+        wrapper = AaveWrapper(
+            LibClone.cloneDeterministic(
+                aaveWrapperImplementation, abi.encodePacked(address(this), yieldHarvestingHook, aToken, aavePool), salt
+            )
+        );
     }
 
     function _initializePool(address currency0, address currency1, uint24 fee, int24 tickSpacing, uint160 sqrtPriceX96)

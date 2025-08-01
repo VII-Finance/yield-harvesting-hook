@@ -4,10 +4,9 @@ pragma solidity ^0.8.26;
 import {ERC4626VaultWrapperTest} from "test/ERC4626VaultWrapper.t.sol";
 import {AaveWrapper} from "src/VaultWrappers/AaveWrapper.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
+import {LibClone} from "lib/solady/src/utils/LibClone.sol";
 
 contract MockAaveWrapper is AaveWrapper {
-    constructor(address _yieldHarvestingHook, address _aavePool) AaveWrapper(_yieldHarvestingHook, _aavePool) {}
-
     function _maxAssetsSuppliableToAave() internal pure override returns (uint256) {
         return type(uint256).max;
     }
@@ -20,12 +19,17 @@ contract MockAaveWrapper is AaveWrapper {
 //It tests ERC4626ness of AaveWrapper
 //It's simple, just returns 1:1 every time
 contract AaveWrapperERC4626nessTest is ERC4626VaultWrapperTest {
+    address aaveWrapperImplementation = address(new MockAaveWrapper());
     address aavePool = makeAddr("aavePool");
 
     function setUp() public virtual override {
         super.setUp();
-        _vault_ = address(new MockAaveWrapper(harvester, aavePool));
-        AaveWrapper(_vault_).initialize(address(underlyingVault), "Aave Wrapper", "AW");
+
+        _vault_ = LibClone.cloneDeterministic(
+            aaveWrapperImplementation,
+            abi.encodePacked(address(this), harvester, address(underlyingVault), address(aavePool)),
+            keccak256(abi.encodePacked(address(underlyingVault), uint256(1))) //make sure salt in unique and not the same as the base test
+        );
     }
 
     function setUpYield(Init memory init) public virtual override {

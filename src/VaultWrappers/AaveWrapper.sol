@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.26;
 
-import {
-    IERC20,
-    Math,
-    ERC4626Upgradeable
-} from "lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {IERC20, Math} from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/ERC4626.sol";
 
 import {IPool} from "@aave-v3-core/interfaces/IPool.sol";
 import {IAToken} from "@aave-v3-core/interfaces/IAToken.sol";
@@ -13,6 +9,8 @@ import {DataTypes as AaveDataTypes} from "@aave-v3-core/protocol/libraries/types
 import {WadRayMath} from "@aave-v3-core/protocol/libraries/math/WadRayMath.sol";
 
 import {BaseVaultWrapper} from "src/VaultWrappers/Base/BaseVaultWrapper.sol";
+import {console} from "lib/forge-std/src/console.sol";
+import {LibClone} from "lib/solady/src/utils/LibClone.sol";
 
 /**
  * @notice This wrapper is intended for use with Aave's monotonically increasing aTokens.
@@ -25,16 +23,12 @@ contract AaveWrapper is BaseVaultWrapper {
     uint256 constant AAVE_SUPPLY_CAP_MASK = 0xFFFFFFFFFFFFFFFFFFFFFFFFFF000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
     uint256 constant AAVE_SUPPLY_CAP_BIT_POSITION = 116;
 
-    IPool public immutable aavePool;
+    uint256 private constant AAVE_POOL_OFFSET = 3;
 
-    constructor(address _yieldHarvestingHook, address _aavePool) BaseVaultWrapper(_yieldHarvestingHook) {
-        aavePool = IPool(_aavePool);
-    }
+    constructor() BaseVaultWrapper() {}
 
-    function initialize(address _underlyingAToken, string memory _name, string memory _symbol) public initializer {
-        underlyingAsset = IAToken(_underlyingAToken).UNDERLYING_ASSET_ADDRESS();
-        __ERC20_init(_name, _symbol);
-        __ERC4626_init(IERC20(_underlyingAToken));
+    function getAavePool() public view returns (IPool) {
+        return IPool(getImmutableArgAddress(AAVE_POOL_OFFSET));
     }
 
     function totalAssets() public view override returns (uint256) {
@@ -74,7 +68,8 @@ contract AaveWrapper is BaseVaultWrapper {
         // returns max uint256 value if supply cap is 0 (not capped)
         // returns supply cap - current amount supplied as max suppliable if there is a supply cap for this reserve
 
-        AaveDataTypes.ReserveData memory reserveData = aavePool.getReserveData(underlyingAsset);
+        AaveDataTypes.ReserveData memory reserveData =
+            getAavePool().getReserveData(underlyingAToken().UNDERLYING_ASSET_ADDRESS());
 
         uint256 reserveConfigMap = reserveData.configuration.data;
         uint256 supplyCap = (reserveConfigMap & ~AAVE_SUPPLY_CAP_MASK) >> AAVE_SUPPLY_CAP_BIT_POSITION;
@@ -103,14 +98,15 @@ contract AaveWrapper is BaseVaultWrapper {
         // returns 0 if reserve is not active, or paused
         // otherwise, returns available liquidity
 
-        AaveDataTypes.ReserveData memory reserveData = aavePool.getReserveData(underlyingAsset);
+        AaveDataTypes.ReserveData memory reserveData =
+            getAavePool().getReserveData(underlyingAToken().UNDERLYING_ASSET_ADDRESS());
 
         uint256 reserveConfigMap = reserveData.configuration.data;
 
         if ((reserveConfigMap & ~AAVE_ACTIVE_MASK == 0) || (reserveConfigMap & ~AAVE_PAUSED_MASK != 0)) {
             return 0;
         } else {
-            return IERC20(underlyingAsset).balanceOf(asset());
+            return IERC20(underlyingAToken().UNDERLYING_ASSET_ADDRESS()).balanceOf(asset());
         }
     }
 
