@@ -53,21 +53,10 @@ contract ERC4626VaultWrapperFactory is Ownable {
         );
     }
 
-    function _initializePool(address currency0, address currency1, uint24 fee, int24 tickSpacing, uint160 sqrtPriceX96)
+    function _initializePool(address tokenA, address tokenB, uint24 fee, int24 tickSpacing, uint160 sqrtPriceX96)
         internal
     {
-        if (currency0 > currency1) {
-            (currency0, currency1) = (currency1, currency0);
-        }
-
-        PoolKey memory poolKey = PoolKey({
-            currency0: Currency.wrap(currency0),
-            currency1: Currency.wrap(currency1),
-            fee: fee,
-            tickSpacing: tickSpacing,
-            hooks: IHooks(address(yieldHarvestingHook))
-        });
-
+        PoolKey memory poolKey = _buildPoolKey(tokenA, tokenB, fee, tickSpacing);
         poolManager.initialize(poolKey, sqrtPriceX96);
     }
 
@@ -139,5 +128,99 @@ contract ERC4626VaultWrapperFactory is Ownable {
 
     function configureWrapperFees(address vaultWrapper, uint256 feeDivisor, address feeReceiver) external onlyOwner {
         BaseVaultWrapper(vaultWrapper).setFeeParameters(feeDivisor, feeReceiver);
+    }
+
+    function predictERC4626VaultPoolKey(
+        IERC4626 underlyingVaultA,
+        IERC4626 underlyingVaultB,
+        uint24 fee,
+        int24 tickSpacing
+    ) external view returns (PoolKey memory poolKey) {
+        address wrapperA =
+            _predictVaultWrapperAddress(address(underlyingVaultA), address(underlyingVaultB), fee, tickSpacing);
+        address wrapperB =
+            _predictVaultWrapperAddress(address(underlyingVaultB), address(underlyingVaultA), fee, tickSpacing);
+
+        return _buildPoolKey(wrapperA, wrapperB, fee, tickSpacing);
+    }
+
+    function predictERC4626VaultToTokenPoolKey(IERC4626 underlyingVault, address token, uint24 fee, int24 tickSpacing)
+        external
+        view
+        returns (PoolKey memory poolKey)
+    {
+        address wrapper = _predictVaultWrapperAddress(address(underlyingVault), token, fee, tickSpacing);
+
+        return _buildPoolKey(wrapper, token, fee, tickSpacing);
+    }
+
+    function predictAaveToERC4626PoolKey(address aToken, IERC4626 underlyingVault, uint24 fee, int24 tickSpacing)
+        external
+        view
+        returns (PoolKey memory poolKey)
+    {
+        address aaveWrapper = _predictAaveWrapperAddress(aToken, address(underlyingVault), fee, tickSpacing);
+        address vaultWrapper = _predictVaultWrapperAddress(address(underlyingVault), aToken, fee, tickSpacing);
+
+        return _buildPoolKey(aaveWrapper, vaultWrapper, fee, tickSpacing);
+    }
+
+    function predictAaveToTokenPoolKey(address aToken, address token, uint24 fee, int24 tickSpacing)
+        external
+        view
+        returns (PoolKey memory poolKey)
+    {
+        address aaveWrapper = _predictAaveWrapperAddress(aToken, token, fee, tickSpacing);
+
+        return _buildPoolKey(aaveWrapper, token, fee, tickSpacing);
+    }
+
+    function predictAavePoolKey(address aTokenA, address aTokenB, uint24 fee, int24 tickSpacing)
+        external
+        view
+        returns (PoolKey memory poolKey)
+    {
+        address aaveWrapperA = _predictAaveWrapperAddress(aTokenA, aTokenB, fee, tickSpacing);
+        address aaveWrapperB = _predictAaveWrapperAddress(aTokenB, aTokenA, fee, tickSpacing);
+
+        return _buildPoolKey(aaveWrapperA, aaveWrapperB, fee, tickSpacing);
+    }
+
+    function _predictVaultWrapperAddress(address vault, address otherToken, uint24 fee, int24 tickSpacing)
+        internal
+        view
+        returns (address wrapperAddress)
+    {
+        bytes32 salt = _generateSalt(vault, otherToken, fee, tickSpacing);
+        bytes memory immutableArgs = abi.encodePacked(address(this), yieldHarvestingHook, vault);
+
+        return LibClone.predictDeterministicAddress(vaultWrapperImplementation, immutableArgs, salt, address(this));
+    }
+
+    function _predictAaveWrapperAddress(address aToken, address otherToken, uint24 fee, int24 tickSpacing)
+        internal
+        view
+        returns (address wrapperAddress)
+    {
+        bytes32 salt = _generateSalt(aToken, otherToken, fee, tickSpacing);
+        bytes memory immutableArgs = abi.encodePacked(address(this), yieldHarvestingHook, aToken, aavePool);
+
+        return LibClone.predictDeterministicAddress(aaveWrapperImplementation, immutableArgs, salt, address(this));
+    }
+
+    function _buildPoolKey(address tokenA, address tokenB, uint24 fee, int24 tickSpacing)
+        internal
+        view
+        returns (PoolKey memory poolKey)
+    {
+        (address currency0, address currency1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
+
+        return PoolKey({
+            currency0: Currency.wrap(currency0),
+            currency1: Currency.wrap(currency1),
+            fee: fee,
+            tickSpacing: tickSpacing,
+            hooks: IHooks(yieldHarvestingHook)
+        });
     }
 }
