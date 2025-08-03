@@ -314,6 +314,60 @@ contract ERC4626VaultWrapperFactoryTest is Test {
         vm.stopPrank();
     }
 
+    function testPredictPoolKeys() public view {
+        // Test ERC4626 vault pair prediction
+        PoolKey memory vaultPairKey =
+            factory.predictERC4626VaultPoolKey(IERC4626(address(vaultA)), IERC4626(address(vaultB)), FEE, TICK_SPACING);
+        assertTrue(Currency.unwrap(vaultPairKey.currency0) != address(0));
+        assertTrue(Currency.unwrap(vaultPairKey.currency1) != address(0));
+        assertEq(vaultPairKey.fee, FEE);
+        assertEq(vaultPairKey.tickSpacing, TICK_SPACING);
+
+        // Test ERC4626 vault to token prediction
+        PoolKey memory vaultToTokenKey =
+            factory.predictERC4626VaultToTokenPoolKey(IERC4626(address(vaultA)), address(tokenA), FEE, TICK_SPACING);
+        assertTrue(Currency.unwrap(vaultToTokenKey.currency0) != address(0));
+        assertTrue(Currency.unwrap(vaultToTokenKey.currency1) != address(0));
+
+        // Test Aave to ERC4626 prediction
+        PoolKey memory aaveToVaultKey =
+            factory.predictAaveToERC4626PoolKey(address(aTokenA), IERC4626(address(vaultA)), FEE, TICK_SPACING);
+        assertTrue(Currency.unwrap(aaveToVaultKey.currency0) != address(0));
+        assertTrue(Currency.unwrap(aaveToVaultKey.currency1) != address(0));
+
+        // Test Aave to token prediction
+        PoolKey memory aaveToTokenKey =
+            factory.predictAaveToTokenPoolKey(address(aTokenA), address(tokenA), FEE, TICK_SPACING);
+        assertTrue(Currency.unwrap(aaveToTokenKey.currency0) != address(0));
+        assertTrue(Currency.unwrap(aaveToTokenKey.currency1) != address(0));
+
+        // Test Aave pair prediction
+        PoolKey memory aavePairKey = factory.predictAavePoolKey(address(aTokenA), address(aTokenB), FEE, TICK_SPACING);
+        assertTrue(Currency.unwrap(aavePairKey.currency0) != address(0));
+        assertTrue(Currency.unwrap(aavePairKey.currency1) != address(0));
+    }
+
+    function testPredictedPoolKeyMatchesActual() public {
+        // Predict the pool key before deployment
+        PoolKey memory predictedKey =
+            factory.predictERC4626VaultPoolKey(IERC4626(address(vaultA)), IERC4626(address(vaultB)), FEE, TICK_SPACING);
+
+        // Deploy the actual pool
+        (ERC4626VaultWrapper vaultWrapperA, ERC4626VaultWrapper vaultWrapperB) = factory.createERC4626VaultPool(
+            IERC4626(address(vaultA)), IERC4626(address(vaultB)), FEE, TICK_SPACING, SQRT_PRICE_X96
+        );
+
+        // Build the actual pool key
+        PoolKey memory actualKey = _buildPoolKey(address(vaultWrapperA), address(vaultWrapperB));
+
+        // Verify they match
+        assertEq(Currency.unwrap(predictedKey.currency0), Currency.unwrap(actualKey.currency0));
+        assertEq(Currency.unwrap(predictedKey.currency1), Currency.unwrap(actualKey.currency1));
+        assertEq(predictedKey.fee, actualKey.fee);
+        assertEq(predictedKey.tickSpacing, actualKey.tickSpacing);
+        assertEq(address(predictedKey.hooks), address(actualKey.hooks));
+    }
+
     function _generateSalt(address token0, address token1, uint24 fee, int24 tickSpacing)
         internal
         pure
