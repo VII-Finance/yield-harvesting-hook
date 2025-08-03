@@ -20,8 +20,8 @@ contract YieldHarvestingHook is BaseHook {
         uint128 liquidity = poolManager.getLiquidity(poolKey.toId());
 
         if (liquidity != 0) {
-            (uint256 yield0,) = _currencyToVaultWrapper(poolKey.currency0).pendingYield();
-            (uint256 yield1,) = _currencyToVaultWrapper(poolKey.currency1).pendingYield();
+            uint256 yield0 = _getPendingYield(poolKey.currency0);
+            uint256 yield1 = _getPendingYield(poolKey.currency1);
 
             if (yield0 != 0 || yield1 != 0) {
                 poolManager.donate(poolKey, yield0, yield1, "");
@@ -87,6 +87,16 @@ contract YieldHarvestingHook is BaseHook {
         returns (bytes4, BeforeSwapDelta, uint24)
     {
         return (this.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
+    }
+
+    function _getPendingYield(Currency currency) internal view returns (uint256) {
+        IVaultWrapper vaultWrapper = _currencyToVaultWrapper(currency);
+
+        try vaultWrapper.pendingYield() returns (uint256 pendingYield, uint256) {
+            return pendingYield;
+        } catch {
+            return 0; // The call is expected to fail if it's not a vault wrapper
+        }
     }
 
     function _currencyToVaultWrapper(Currency currency) internal pure returns (IVaultWrapper) {
