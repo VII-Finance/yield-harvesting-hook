@@ -82,14 +82,12 @@ contract ERC4626VaultWrapperFactoryTest is Test {
             payable(
                 address(
                     uint160(
-                        type(uint160).max & clearAllHookPermissionsMask | Hooks.BEFORE_SWAP_FLAG
-                            | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
+                        type(uint160).max & clearAllHookPermissionsMask | Hooks.BEFORE_INITIALIZE_FLAG
+                            | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
                     )
                 )
             )
         );
-
-        deployCodeTo("YieldHarvestingHook", abi.encode(poolManager), address(yieldHarvestingHook));
 
         poolManager = new PoolManager(poolManagerOwner);
         tokenA = makeAddr("tokenA");
@@ -101,6 +99,8 @@ contract ERC4626VaultWrapperFactoryTest is Test {
         aTokenB = new MockAToken();
 
         factory = new ERC4626VaultWrapperFactory(factoryOwner, poolManager, address(yieldHarvestingHook), aavePool);
+
+        deployCodeTo("YieldHarvestingHook", abi.encode(poolManager, factory), address(yieldHarvestingHook));
     }
 
     function isPoolInitialized(PoolKey memory poolKey) internal view returns (bool) {
