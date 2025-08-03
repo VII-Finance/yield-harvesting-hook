@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.26;
 
-import {
-    IERC20,
-    ERC20,
-    Math,
-    ERC4626,
-    IERC20Metadata
-} from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/ERC4626.sol";
+import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import {ERC4626} from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/ERC4626.sol";
+import {IERC20Metadata} from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {LibClone} from "lib/solady/src/utils/LibClone.sol";
 
@@ -26,10 +23,8 @@ abstract contract BaseVaultWrapper is ERC4626, IVaultWrapper {
     uint256 public feeDivisor;
     address public feeReceiver;
 
-    using LibClone for address;
-
     error NotYieldHarvester();
-    error InvalidFeeDivisor();
+    error InvalidFeeParams();
     error NotFactory();
 
     event FeeParametersSet(uint256 feeDivisor, address feeReceiver);
@@ -74,7 +69,8 @@ abstract contract BaseVaultWrapper is ERC4626, IVaultWrapper {
 
     function setFeeParameters(uint256 _feeDivisor, address _feeReceiver) external {
         if (_msgSender() != getFactory()) revert NotFactory();
-        if (_feeDivisor != 0 && _feeDivisor < MIN_FEE_DIVISOR) revert InvalidFeeDivisor();
+        if (_feeDivisor != 0 && _feeDivisor < MIN_FEE_DIVISOR) revert InvalidFeeParams();
+        if (_feeReceiver == address(0)) revert InvalidFeeParams();
         feeDivisor = _feeDivisor;
         feeReceiver = _feeReceiver;
 
@@ -100,7 +96,7 @@ abstract contract BaseVaultWrapper is ERC4626, IVaultWrapper {
     }
 
     function _calculateFees(uint256 totalYield) internal view returns (uint256) {
-        if (feeDivisor == 0 || feeReceiver == address(0)) {
+        if (feeDivisor == 0) {
             return 0;
         }
         return totalYield / feeDivisor;

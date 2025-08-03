@@ -29,22 +29,6 @@ contract ERC4626VaultWrapperFactory is Ownable {
         aaveWrapperImplementation = address(new AaveWrapper());
     }
 
-    function getWrapperName(IERC4626 vault) public view returns (string memory) {
-        return string(abi.encodePacked("VII Finance Wrapped ", vault.name()));
-    }
-
-    function getWrapperSymbol(IERC4626 vault) public view returns (string memory) {
-        return string(abi.encodePacked("VII-", vault.symbol()));
-    }
-
-    function getAaveWrapperName(address aToken) public view returns (string memory) {
-        return string(abi.encodePacked("VII Finance Aave Wrapped ", IERC4626(aToken).name()));
-    }
-
-    function getAaveWrapperSymbol(address aToken) public view returns (string memory) {
-        return string(abi.encodePacked("VII-A-", IERC4626(aToken).symbol()));
-    }
-
     function _generateSalt(address tokenA, address tokenB, uint24 fee, int24 tickSpacing)
         internal
         pure

@@ -9,8 +9,6 @@ import {DataTypes as AaveDataTypes} from "@aave-v3-core/protocol/libraries/types
 import {WadRayMath} from "@aave-v3-core/protocol/libraries/math/WadRayMath.sol";
 
 import {BaseVaultWrapper} from "src/VaultWrappers/Base/BaseVaultWrapper.sol";
-import {console} from "lib/forge-std/src/console.sol";
-import {LibClone} from "lib/solady/src/utils/LibClone.sol";
 
 /**
  * @notice This wrapper is intended for use with Aave's monotonically increasing aTokens.
