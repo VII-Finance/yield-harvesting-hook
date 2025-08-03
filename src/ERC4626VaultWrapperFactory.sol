@@ -71,11 +71,11 @@ contract ERC4626VaultWrapperFactory is Ownable {
         poolManager.initialize(poolKey, sqrtPriceX96);
     }
 
-    function initializeVaultToVaultPool(
-        uint24 fee,
-        int24 tickSpacing,
+    function createERC4626VaultPool(
         IERC4626 underlyingVaultA,
         IERC4626 underlyingVaultB,
+        uint24 fee,
+        int24 tickSpacing,
         uint160 sqrtPriceX96
     ) external returns (ERC4626VaultWrapper vaultWrapperA, ERC4626VaultWrapper vaultWrapperB) {
         vaultWrapperA = _deployVaultWrapper(
@@ -89,11 +89,11 @@ contract ERC4626VaultWrapperFactory is Ownable {
         _initializePool(address(vaultWrapperA), address(vaultWrapperB), fee, tickSpacing, sqrtPriceX96);
     }
 
-    function initializeVaultToTokenPool(
-        uint24 fee,
-        int24 tickSpacing,
+    function createERC4626VaultToTokenPool(
         IERC4626 underlyingVaultA,
         address assetB,
+        uint24 fee,
+        int24 tickSpacing,
         uint160 sqrtPriceX96
     ) external returns (ERC4626VaultWrapper vaultWrapper) {
         vaultWrapper =
@@ -102,11 +102,11 @@ contract ERC4626VaultWrapperFactory is Ownable {
         _initializePool(address(vaultWrapper), assetB, fee, tickSpacing, sqrtPriceX96);
     }
 
-    function initializeAaveToVaultPool(
-        uint24 fee,
-        int24 tickSpacing,
+    function createAaveToERC4626Pool(
         address aToken,
         IERC4626 underlyingVault,
+        uint24 fee,
+        int24 tickSpacing,
         uint160 sqrtPriceX96
     ) external returns (AaveWrapper aaveWrapper, ERC4626VaultWrapper vaultWrapper) {
         aaveWrapper = _deployAaveWrapper(aToken, _generateSalt(aToken, address(underlyingVault), fee, tickSpacing));
@@ -117,25 +117,19 @@ contract ERC4626VaultWrapperFactory is Ownable {
         _initializePool(address(aaveWrapper), address(vaultWrapper), fee, tickSpacing, sqrtPriceX96);
     }
 
-    function initializeAaveToTokenPool(
-        uint24 fee,
-        int24 tickSpacing,
-        address aToken,
-        address asset,
-        uint160 sqrtPriceX96
-    ) external returns (AaveWrapper aaveWrapper) {
+    function createAaveToTokenPool(address aToken, address asset, uint24 fee, int24 tickSpacing, uint160 sqrtPriceX96)
+        external
+        returns (AaveWrapper aaveWrapper)
+    {
         aaveWrapper = _deployAaveWrapper(aToken, _generateSalt(aToken, asset, fee, tickSpacing));
 
         _initializePool(address(aaveWrapper), asset, fee, tickSpacing, sqrtPriceX96);
     }
 
-    function initializeAaveToAavePool(
-        uint24 fee,
-        int24 tickSpacing,
-        address aTokenA,
-        address aTokenB,
-        uint160 sqrtPriceX96
-    ) external returns (AaveWrapper aaveWrapperA, AaveWrapper aaveWrapperB) {
+    function createAavePool(address aTokenA, address aTokenB, uint24 fee, int24 tickSpacing, uint160 sqrtPriceX96)
+        external
+        returns (AaveWrapper aaveWrapperA, AaveWrapper aaveWrapperB)
+    {
         aaveWrapperA = _deployAaveWrapper(aTokenA, _generateSalt(aTokenA, aTokenB, fee, tickSpacing));
 
         aaveWrapperB = _deployAaveWrapper(aTokenB, _generateSalt(aTokenB, aTokenA, fee, tickSpacing));
@@ -143,7 +137,7 @@ contract ERC4626VaultWrapperFactory is Ownable {
         _initializePool(address(aaveWrapperA), address(aaveWrapperB), fee, tickSpacing, sqrtPriceX96);
     }
 
-    function setVaultWrapperFees(address vaultWrapper, uint256 feeDivisor, address feeReceiver) external onlyOwner {
+    function configureWrapperFees(address vaultWrapper, uint256 feeDivisor, address feeReceiver) external onlyOwner {
         BaseVaultWrapper(vaultWrapper).setFeeParameters(feeDivisor, feeReceiver);
     }
 }

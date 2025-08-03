@@ -79,8 +79,8 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         MockERC20 assetB = new MockERC20();
         MockERC4626 underlyingVaultB = new MockERC4626(assetB);
         (ERC4626VaultWrapper vaultWrapperA, ERC4626VaultWrapper vaultWrapperB) = vaultWrappersFactory
-            .initializeVaultToVaultPool(
-            3000, 60, IERC4626(address(underlyingVaultA)), IERC4626(address(underlyingVaultB)), Constants.SQRT_PRICE_1_1
+            .createERC4626VaultPool(
+            IERC4626(address(underlyingVaultA)), IERC4626(address(underlyingVaultB)), 3000, 60, Constants.SQRT_PRICE_1_1
         );
         // Compare vaultWrapper addresses and assign 0/1 based on which is lower
         if (address(vaultWrapperA) < address(vaultWrapperB)) {
