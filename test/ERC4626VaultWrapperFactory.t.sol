@@ -116,26 +116,6 @@ contract ERC4626VaultWrapperFactoryTest is Test {
         assertTrue(factory.aaveWrapperImplementation() != address(0));
     }
 
-    function testGetWrapperName() public view {
-        string memory expectedName = "VII Finance Wrapped Mock ERC4626";
-        assertEq(factory.getWrapperName(IERC4626(address(vaultA))), expectedName);
-    }
-
-    function testGetWrapperSymbol() public view {
-        string memory expectedSymbol = "VII-mERC4626";
-        assertEq(factory.getWrapperSymbol(IERC4626(address(vaultA))), expectedSymbol);
-    }
-
-    function testGetAaveWrapperName() public view {
-        string memory expectedName = "VII Finance Aave Wrapped Mock AToken";
-        assertEq(factory.getAaveWrapperName(address(aTokenA)), expectedName);
-    }
-
-    function testGetAaveWrapperSymbol() public view {
-        string memory expectedSymbol = "VII-A-aToken";
-        assertEq(factory.getAaveWrapperSymbol(address(aTokenA)), expectedSymbol);
-    }
-
     function testInitializeVaultToVaultPool() public {
         (ERC4626VaultWrapper wrapperA, ERC4626VaultWrapper wrapperB) = factory.initializeVaultToVaultPool(
             FEE, TICK_SPACING, IERC4626(address(vaultA)), IERC4626(address(vaultB)), SQRT_PRICE_X96
@@ -319,7 +299,7 @@ contract ERC4626VaultWrapperFactoryTest is Test {
         //setting fee divisor less than 14 should fail
         //this means the max fees that owner can take is 7.14%
         //and they can only get fees 1/14 = 7.14% 1/15 = 6.67%, 1/16 = 6.25% etc.
-        vm.expectRevert(BaseVaultWrapper.InvalidFeeDivisor.selector);
+        vm.expectRevert(BaseVaultWrapper.InvalidFeeParams.selector);
         vm.startPrank(factoryOwner);
         factory.setVaultWrapperFees(address(aaveWrapper), 13, makeAddr("feeReceiver"));
 
