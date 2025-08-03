@@ -16,6 +16,7 @@ import {PoolSwapTest} from "@uniswap/v4-core/src/test/PoolSwapTest.sol";
 import {LiquidityAmounts} from "lib/v4-periphery/lib/v4-core/test/utils/LiquidityAmounts.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {Fuzzers} from "lib/v4-periphery/lib/v4-core/src/test/Fuzzers.sol";
+import {CustomRevert} from "lib/v4-periphery/lib/v4-core/src/libraries/CustomRevert.sol";
 
 import {YieldHarvestingHook} from "src/YieldHarvestingHook.sol";
 import {ERC4626VaultWrapperFactory} from "src/ERC4626VaultWrapperFactory.sol";
@@ -61,17 +62,16 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
             payable(
                 address(
                     uint160(
-                        type(uint160).max & clearAllHookPermissionsMask | Hooks.BEFORE_SWAP_FLAG
-                            | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
+                        type(uint160).max & clearAllHookPermissionsMask | Hooks.BEFORE_INITIALIZE_FLAG
+                            | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
                     )
                 )
             )
         );
-
-        deployCodeTo("YieldHarvestingHook", abi.encode(poolManager), address(yieldHarvestingHook));
-
         vaultWrappersFactory =
             new ERC4626VaultWrapperFactory(vaultFactoryOwner, poolManager, address(yieldHarvestingHook), aavePool);
+
+        deployCodeTo("YieldHarvestingHook", abi.encode(poolManager, vaultWrappersFactory), address(yieldHarvestingHook));
 
         MockERC20 assetA = new MockERC20();
         MockERC4626 underlyingVaultA = new MockERC4626(assetA);
@@ -227,5 +227,10 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
             1,
             "Balance for currency1 should increase by yield1"
         );
+    }
+
+    function testPoolInitializationFailsIfNotFactory(uint160 sqrtPriceX96) public {
+        vm.expectRevert();
+        poolManager.initialize(poolKey, sqrtPriceX96);
     }
 }

@@ -13,7 +13,13 @@ import {IVaultWrapper} from "src/interfaces/IVaultWrapper.sol";
 contract YieldHarvestingHook is BaseHook {
     using StateLibrary for IPoolManager;
 
-    constructor(IPoolManager _manager) BaseHook(_manager) {}
+    address public immutable erc4626VaultWrapperFactory;
+
+    error NotFactory();
+
+    constructor(IPoolManager _manager, address _factory) BaseHook(_manager) {
+        erc4626VaultWrapperFactory = _factory;
+    }
 
     modifier harvestAndDistributeYield(PoolKey calldata poolKey) {
         uint128 liquidity = poolManager.getLiquidity(poolKey.toId());
@@ -44,7 +50,7 @@ contract YieldHarvestingHook is BaseHook {
 
     function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
         return Hooks.Permissions({
-            beforeInitialize: false,
+            beforeInitialize: true,
             afterInitialize: false,
             beforeAddLiquidity: true,
             afterAddLiquidity: false,
@@ -59,6 +65,14 @@ contract YieldHarvestingHook is BaseHook {
             afterAddLiquidityReturnDelta: false,
             afterRemoveLiquidityReturnDelta: false
         });
+    }
+
+    /// @notice Ensures that only the ERC4626 vault wrapper factory can initialize a pool with this hook
+    function _beforeInitialize(address caller, PoolKey calldata, uint160) internal view override returns (bytes4) {
+        if (caller != erc4626VaultWrapperFactory) {
+            revert NotFactory();
+        }
+        return this.beforeInitialize.selector;
     }
 
     function _beforeAddLiquidity(address, PoolKey calldata poolKey, ModifyLiquidityParams calldata, bytes calldata)
