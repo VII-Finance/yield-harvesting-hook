@@ -98,9 +98,11 @@ contract ERC4626VaultWrapperFactoryTest is Test {
         aTokenA = new MockAToken();
         aTokenB = new MockAToken();
 
-        factory = new ERC4626VaultWrapperFactory(factoryOwner, poolManager, address(yieldHarvestingHook), aavePool);
+        deployCodeTo(
+            "YieldHarvestingHook", abi.encode(factoryOwner, poolManager, aavePool), address(yieldHarvestingHook)
+        );
 
-        deployCodeTo("YieldHarvestingHook", abi.encode(poolManager, factory), address(yieldHarvestingHook));
+        factory = ERC4626VaultWrapperFactory(yieldHarvestingHook.erc4626VaultWrapperFactory());
     }
 
     function isPoolInitialized(PoolKey memory poolKey) internal view returns (bool) {
