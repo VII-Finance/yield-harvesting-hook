@@ -18,8 +18,8 @@ contract YieldHarvestingHook is BaseHook {
 
     error NotFactory();
 
-    constructor(address _owner, IPoolManager _manager, address _aavePool) BaseHook(_manager) {
-        erc4626VaultWrapperFactory = address(new ERC4626VaultWrapperFactory(_owner, _manager, address(this), _aavePool));
+    constructor(address _owner, IPoolManager _manager) BaseHook(_manager) {
+        erc4626VaultWrapperFactory = address(new ERC4626VaultWrapperFactory(_owner, _manager, address(this)));
     }
 
     modifier harvestAndDistributeYield(PoolKey calldata poolKey) {

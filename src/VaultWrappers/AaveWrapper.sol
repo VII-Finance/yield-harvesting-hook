@@ -10,6 +10,11 @@ import {WadRayMath} from "@aave-v3-core/protocol/libraries/math/WadRayMath.sol";
 
 import {BaseVaultWrapper} from "src/VaultWrappers/Base/BaseVaultWrapper.sol";
 
+interface IATokenWithPool is IAToken {
+    //This method is exposed by actual aTokens but it isn't in IAToken interface
+    function POOL() external view returns (address);
+}
+
 /**
  * @notice This wrapper is intended for use with Aave's monotonically increasing aTokens.
  * @dev Aave does not have bad debt socialization, so this wrapper will always remain solvent.
@@ -21,12 +26,10 @@ contract AaveWrapper is BaseVaultWrapper {
     uint256 constant AAVE_SUPPLY_CAP_MASK = 0xFFFFFFFFFFFFFFFFFFFFFFFFFF000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
     uint256 constant AAVE_SUPPLY_CAP_BIT_POSITION = 116;
 
-    uint256 private constant AAVE_POOL_OFFSET = 3;
-
     constructor() BaseVaultWrapper() {}
 
     function getAavePool() public view returns (IPool) {
-        return IPool(getImmutableArgAddress(AAVE_POOL_OFFSET));
+        return IPool(IATokenWithPool(asset()).POOL());
     }
 
     function totalAssets() public view override returns (uint256) {
