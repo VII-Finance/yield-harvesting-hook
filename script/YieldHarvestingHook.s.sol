@@ -22,6 +22,8 @@ contract YieldHarvestingHookScript is Script {
             CREATE2_DEPLOYER, HOOK_PERMISSIONS, type(YieldHarvestingHook).creationCode, abi.encode(owner, poolManager)
         );
 
+        vm.startBroadcast();
         new YieldHarvestingHook{salt: salt}(owner, poolManager);
+        vm.stopBroadcast();
     }
 }
