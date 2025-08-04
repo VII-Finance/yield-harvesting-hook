@@ -20,14 +20,13 @@ contract MockAaveWrapper is AaveWrapper {
 //It's simple, just returns 1:1 every time
 contract AaveWrapperERC4626nessTest is ERC4626VaultWrapperTest {
     address aaveWrapperImplementation = address(new MockAaveWrapper());
-    address aavePool = makeAddr("aavePool");
 
     function setUp() public virtual override {
         super.setUp();
 
         _vault_ = LibClone.cloneDeterministic(
             aaveWrapperImplementation,
-            abi.encodePacked(address(this), harvester, address(underlyingVault), address(aavePool)),
+            abi.encodePacked(address(this), harvester, address(underlyingVault)),
             keccak256(abi.encodePacked(address(underlyingVault), uint256(1))) //make sure salt in unique and not the same as the base test
         );
     }

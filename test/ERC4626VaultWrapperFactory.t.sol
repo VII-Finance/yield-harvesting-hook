@@ -58,7 +58,6 @@ contract ERC4626VaultWrapperFactoryTest is Test {
     PoolManager public poolManager;
     address poolManagerOwner = makeAddr("poolManagerOwner");
     YieldHarvestingHook yieldHarvestingHook;
-    address aavePool = makeAddr("aavePool");
     address factoryOwner = makeAddr("factoryOwner");
 
     address tokenA;
@@ -98,9 +97,7 @@ contract ERC4626VaultWrapperFactoryTest is Test {
         aTokenA = new MockAToken();
         aTokenB = new MockAToken();
 
-        deployCodeTo(
-            "YieldHarvestingHook", abi.encode(factoryOwner, poolManager, aavePool), address(yieldHarvestingHook)
-        );
+        deployCodeTo("YieldHarvestingHook", abi.encode(factoryOwner, poolManager), address(yieldHarvestingHook));
 
         factory = ERC4626VaultWrapperFactory(yieldHarvestingHook.erc4626VaultWrapperFactory());
     }
@@ -113,7 +110,6 @@ contract ERC4626VaultWrapperFactoryTest is Test {
     function testConstructor() public view {
         assertEq(address(factory.poolManager()), address(poolManager));
         assertEq(factory.yieldHarvestingHook(), address(address(yieldHarvestingHook)));
-        assertEq(factory.aavePool(), address(aavePool));
         assertTrue(factory.vaultWrapperImplementation() != address(0));
         assertTrue(factory.aaveWrapperImplementation() != address(0));
     }
@@ -383,7 +379,7 @@ contract ERC4626VaultWrapperFactoryTest is Test {
     }
 
     function _generateImmutableArgsForAaveWrapper(address aToken) internal view returns (bytes memory) {
-        return abi.encodePacked(address(factory), address(yieldHarvestingHook), aToken, aavePool);
+        return abi.encodePacked(address(factory), address(yieldHarvestingHook), aToken);
     }
 
     function _buildPoolKey(address token0, address token1) internal view returns (PoolKey memory) {

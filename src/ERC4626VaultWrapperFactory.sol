@@ -17,14 +17,10 @@ contract ERC4626VaultWrapperFactory is Ownable {
     address public immutable yieldHarvestingHook;
     address public immutable vaultWrapperImplementation;
     address public immutable aaveWrapperImplementation;
-    address public immutable aavePool;
 
-    constructor(address _owner, IPoolManager _manager, address _yieldHarvestingHook, address _aavePool)
-        Ownable(_owner)
-    {
+    constructor(address _owner, IPoolManager _manager, address _yieldHarvestingHook) Ownable(_owner) {
         poolManager = _manager;
         yieldHarvestingHook = _yieldHarvestingHook;
-        aavePool = _aavePool;
         vaultWrapperImplementation = address(new ERC4626VaultWrapper());
         aaveWrapperImplementation = address(new AaveWrapper());
     }
@@ -37,19 +33,12 @@ contract ERC4626VaultWrapperFactory is Ownable {
         return keccak256(abi.encodePacked(tokenA, tokenB, fee, tickSpacing));
     }
 
-    function _deployVaultWrapper(IERC4626 vault, bytes32 salt) internal returns (ERC4626VaultWrapper wrapper) {
-        wrapper = ERC4626VaultWrapper(
-            LibClone.cloneDeterministic(
-                vaultWrapperImplementation, abi.encodePacked(address(this), yieldHarvestingHook, address(vault)), salt
-            )
-        );
-    }
-
-    function _deployAaveWrapper(address aToken, bytes32 salt) internal returns (AaveWrapper wrapper) {
-        wrapper = AaveWrapper(
-            LibClone.cloneDeterministic(
-                aaveWrapperImplementation, abi.encodePacked(address(this), yieldHarvestingHook, aToken, aavePool), salt
-            )
+    function _deployVaultWrapper(address implementation, address underlyingVault, bytes32 salt)
+        internal
+        returns (address wrapper)
+    {
+        wrapper = LibClone.cloneDeterministic(
+            implementation, abi.encodePacked(address(this), yieldHarvestingHook, underlyingVault), salt
         );
     }
 
@@ -67,12 +56,20 @@ contract ERC4626VaultWrapperFactory is Ownable {
         int24 tickSpacing,
         uint160 sqrtPriceX96
     ) external returns (ERC4626VaultWrapper vaultWrapperA, ERC4626VaultWrapper vaultWrapperB) {
-        vaultWrapperA = _deployVaultWrapper(
-            underlyingVaultA, _generateSalt(address(underlyingVaultA), address(underlyingVaultB), fee, tickSpacing)
+        vaultWrapperA = ERC4626VaultWrapper(
+            _deployVaultWrapper(
+                vaultWrapperImplementation,
+                address(underlyingVaultA),
+                _generateSalt(address(underlyingVaultA), address(underlyingVaultB), fee, tickSpacing)
+            )
         );
 
-        vaultWrapperB = _deployVaultWrapper(
-            underlyingVaultB, _generateSalt(address(underlyingVaultB), address(underlyingVaultA), fee, tickSpacing)
+        vaultWrapperB = ERC4626VaultWrapper(
+            _deployVaultWrapper(
+                vaultWrapperImplementation,
+                address(underlyingVaultB),
+                _generateSalt(address(underlyingVaultB), address(underlyingVaultA), fee, tickSpacing)
+            )
         );
 
         _initializePool(address(vaultWrapperA), address(vaultWrapperB), fee, tickSpacing, sqrtPriceX96);
@@ -85,8 +82,13 @@ contract ERC4626VaultWrapperFactory is Ownable {
         int24 tickSpacing,
         uint160 sqrtPriceX96
     ) external returns (ERC4626VaultWrapper vaultWrapper) {
-        vaultWrapper =
-            _deployVaultWrapper(underlyingVaultA, _generateSalt(address(underlyingVaultA), assetB, fee, tickSpacing));
+        vaultWrapper = ERC4626VaultWrapper(
+            _deployVaultWrapper(
+                vaultWrapperImplementation,
+                address(underlyingVaultA),
+                _generateSalt(address(underlyingVaultA), assetB, fee, tickSpacing)
+            )
+        );
 
         _initializePool(address(vaultWrapper), assetB, fee, tickSpacing, sqrtPriceX96);
     }
@@ -98,10 +100,19 @@ contract ERC4626VaultWrapperFactory is Ownable {
         int24 tickSpacing,
         uint160 sqrtPriceX96
     ) external returns (AaveWrapper aaveWrapper, ERC4626VaultWrapper vaultWrapper) {
-        aaveWrapper = _deployAaveWrapper(aToken, _generateSalt(aToken, address(underlyingVault), fee, tickSpacing));
+        aaveWrapper = AaveWrapper(
+            _deployVaultWrapper(
+                aaveWrapperImplementation, aToken, _generateSalt(aToken, address(underlyingVault), fee, tickSpacing)
+            )
+        );
 
-        vaultWrapper =
-            _deployVaultWrapper(underlyingVault, _generateSalt(address(underlyingVault), aToken, fee, tickSpacing));
+        vaultWrapper = ERC4626VaultWrapper(
+            _deployVaultWrapper(
+                vaultWrapperImplementation,
+                address(underlyingVault),
+                _generateSalt(address(underlyingVault), aToken, fee, tickSpacing)
+            )
+        );
 
         _initializePool(address(aaveWrapper), address(vaultWrapper), fee, tickSpacing, sqrtPriceX96);
     }
@@ -110,7 +121,9 @@ contract ERC4626VaultWrapperFactory is Ownable {
         external
         returns (AaveWrapper aaveWrapper)
     {
-        aaveWrapper = _deployAaveWrapper(aToken, _generateSalt(aToken, asset, fee, tickSpacing));
+        aaveWrapper = AaveWrapper(
+            _deployVaultWrapper(aaveWrapperImplementation, aToken, _generateSalt(aToken, asset, fee, tickSpacing))
+        );
 
         _initializePool(address(aaveWrapper), asset, fee, tickSpacing, sqrtPriceX96);
     }
@@ -119,9 +132,13 @@ contract ERC4626VaultWrapperFactory is Ownable {
         external
         returns (AaveWrapper aaveWrapperA, AaveWrapper aaveWrapperB)
     {
-        aaveWrapperA = _deployAaveWrapper(aTokenA, _generateSalt(aTokenA, aTokenB, fee, tickSpacing));
+        aaveWrapperA = AaveWrapper(
+            _deployVaultWrapper(aaveWrapperImplementation, aTokenA, _generateSalt(aTokenA, aTokenB, fee, tickSpacing))
+        );
 
-        aaveWrapperB = _deployAaveWrapper(aTokenB, _generateSalt(aTokenB, aTokenA, fee, tickSpacing));
+        aaveWrapperB = AaveWrapper(
+            _deployVaultWrapper(aaveWrapperImplementation, aTokenB, _generateSalt(aTokenB, aTokenA, fee, tickSpacing))
+        );
 
         _initializePool(address(aaveWrapperA), address(aaveWrapperB), fee, tickSpacing, sqrtPriceX96);
     }
@@ -136,10 +153,12 @@ contract ERC4626VaultWrapperFactory is Ownable {
         uint24 fee,
         int24 tickSpacing
     ) external view returns (PoolKey memory poolKey) {
-        address wrapperA =
-            _predictVaultWrapperAddress(address(underlyingVaultA), address(underlyingVaultB), fee, tickSpacing);
-        address wrapperB =
-            _predictVaultWrapperAddress(address(underlyingVaultB), address(underlyingVaultA), fee, tickSpacing);
+        address wrapperA = _predictVaultWrapperAddress(
+            vaultWrapperImplementation, address(underlyingVaultA), address(underlyingVaultB), fee, tickSpacing
+        );
+        address wrapperB = _predictVaultWrapperAddress(
+            vaultWrapperImplementation, address(underlyingVaultB), address(underlyingVaultA), fee, tickSpacing
+        );
 
         return _buildPoolKey(wrapperA, wrapperB, fee, tickSpacing);
     }
@@ -149,7 +168,8 @@ contract ERC4626VaultWrapperFactory is Ownable {
         view
         returns (PoolKey memory poolKey)
     {
-        address wrapper = _predictVaultWrapperAddress(address(underlyingVault), token, fee, tickSpacing);
+        address wrapper =
+            _predictVaultWrapperAddress(vaultWrapperImplementation, address(underlyingVault), token, fee, tickSpacing);
 
         return _buildPoolKey(wrapper, token, fee, tickSpacing);
     }
@@ -159,8 +179,10 @@ contract ERC4626VaultWrapperFactory is Ownable {
         view
         returns (PoolKey memory poolKey)
     {
-        address aaveWrapper = _predictAaveWrapperAddress(aToken, address(underlyingVault), fee, tickSpacing);
-        address vaultWrapper = _predictVaultWrapperAddress(address(underlyingVault), aToken, fee, tickSpacing);
+        address aaveWrapper =
+            _predictVaultWrapperAddress(aaveWrapperImplementation, aToken, address(underlyingVault), fee, tickSpacing);
+        address vaultWrapper =
+            _predictVaultWrapperAddress(vaultWrapperImplementation, address(underlyingVault), aToken, fee, tickSpacing);
 
         return _buildPoolKey(aaveWrapper, vaultWrapper, fee, tickSpacing);
     }
@@ -170,7 +192,7 @@ contract ERC4626VaultWrapperFactory is Ownable {
         view
         returns (PoolKey memory poolKey)
     {
-        address aaveWrapper = _predictAaveWrapperAddress(aToken, token, fee, tickSpacing);
+        address aaveWrapper = _predictVaultWrapperAddress(aaveWrapperImplementation, aToken, token, fee, tickSpacing);
 
         return _buildPoolKey(aaveWrapper, token, fee, tickSpacing);
     }
@@ -180,32 +202,25 @@ contract ERC4626VaultWrapperFactory is Ownable {
         view
         returns (PoolKey memory poolKey)
     {
-        address aaveWrapperA = _predictAaveWrapperAddress(aTokenA, aTokenB, fee, tickSpacing);
-        address aaveWrapperB = _predictAaveWrapperAddress(aTokenB, aTokenA, fee, tickSpacing);
+        address aaveWrapperA =
+            _predictVaultWrapperAddress(aaveWrapperImplementation, aTokenA, aTokenB, fee, tickSpacing);
+        address aaveWrapperB =
+            _predictVaultWrapperAddress(aaveWrapperImplementation, aTokenB, aTokenA, fee, tickSpacing);
 
         return _buildPoolKey(aaveWrapperA, aaveWrapperB, fee, tickSpacing);
     }
 
-    function _predictVaultWrapperAddress(address vault, address otherToken, uint24 fee, int24 tickSpacing)
-        internal
-        view
-        returns (address wrapperAddress)
-    {
+    function _predictVaultWrapperAddress(
+        address implementation,
+        address vault,
+        address otherToken,
+        uint24 fee,
+        int24 tickSpacing
+    ) internal view returns (address wrapperAddress) {
         bytes32 salt = _generateSalt(vault, otherToken, fee, tickSpacing);
         bytes memory immutableArgs = abi.encodePacked(address(this), yieldHarvestingHook, vault);
 
-        return LibClone.predictDeterministicAddress(vaultWrapperImplementation, immutableArgs, salt, address(this));
-    }
-
-    function _predictAaveWrapperAddress(address aToken, address otherToken, uint24 fee, int24 tickSpacing)
-        internal
-        view
-        returns (address wrapperAddress)
-    {
-        bytes32 salt = _generateSalt(aToken, otherToken, fee, tickSpacing);
-        bytes memory immutableArgs = abi.encodePacked(address(this), yieldHarvestingHook, aToken, aavePool);
-
-        return LibClone.predictDeterministicAddress(aaveWrapperImplementation, immutableArgs, salt, address(this));
+        return LibClone.predictDeterministicAddress(implementation, immutableArgs, salt, address(this));
     }
 
     function _buildPoolKey(address tokenA, address tokenB, uint24 fee, int24 tickSpacing)

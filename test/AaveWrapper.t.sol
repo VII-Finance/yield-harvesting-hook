@@ -32,7 +32,7 @@ contract AaveWrapperTest is Test {
         return AaveWrapper(
             LibClone.cloneDeterministic(
                 aaveWrapperImplementation,
-                abi.encodePacked(address(this), yieldHarvestingHook, address(aToken), address(aavePool)),
+                abi.encodePacked(address(this), yieldHarvestingHook, address(aToken)),
                 keccak256(abi.encodePacked(address(aToken)))
             )
         );
