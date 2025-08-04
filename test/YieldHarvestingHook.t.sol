@@ -68,10 +68,12 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
                 )
             )
         );
-        vaultWrappersFactory =
-            new ERC4626VaultWrapperFactory(vaultFactoryOwner, poolManager, address(yieldHarvestingHook), aavePool);
 
-        deployCodeTo("YieldHarvestingHook", abi.encode(poolManager, vaultWrappersFactory), address(yieldHarvestingHook));
+        deployCodeTo(
+            "YieldHarvestingHook", abi.encode(vaultFactoryOwner, poolManager, aavePool), address(yieldHarvestingHook)
+        );
+
+        vaultWrappersFactory = ERC4626VaultWrapperFactory(yieldHarvestingHook.erc4626VaultWrapperFactory());
 
         MockERC20 assetA = new MockERC20();
         MockERC4626 underlyingVaultA = new MockERC4626(assetA);

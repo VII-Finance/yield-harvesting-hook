@@ -9,6 +9,7 @@ import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {IVaultWrapper} from "src/interfaces/IVaultWrapper.sol";
+import {ERC4626VaultWrapperFactory} from "src/ERC4626VaultWrapperFactory.sol";
 
 contract YieldHarvestingHook is BaseHook {
     using StateLibrary for IPoolManager;
@@ -17,8 +18,8 @@ contract YieldHarvestingHook is BaseHook {
 
     error NotFactory();
 
-    constructor(IPoolManager _manager, address _factory) BaseHook(_manager) {
-        erc4626VaultWrapperFactory = _factory;
+    constructor(address _owner, IPoolManager _manager, address _aavePool) BaseHook(_manager) {
+        erc4626VaultWrapperFactory = address(new ERC4626VaultWrapperFactory(_owner, _manager, address(this), _aavePool));
     }
 
     modifier harvestAndDistributeYield(PoolKey calldata poolKey) {
