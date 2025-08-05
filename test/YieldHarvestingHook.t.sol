@@ -148,7 +148,9 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         modifyLiquidityRouter.modifyLiquidity(poolKey, params, "");
     }
 
-    function test_donateLiquidity(ModifyLiquidityParams memory params, uint256 yield0, uint256 yield1) public {
+    function test_yieldAndHarvestBeforeSwap(ModifyLiquidityParams memory params, uint256 yield0, uint256 yield1)
+        public
+    {
         //liquidity to full range to make test simpler
         params.tickLower = TickMath.minUsableTick(poolKey.tickSpacing);
         params.tickUpper = TickMath.maxUsableTick(poolKey.tickSpacing);
@@ -210,7 +212,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         assertApproxEqAbs(feesOwed.amount0(), int256(yield0), 1, "feesOwed amount0 mismatch");
         assertApproxEqAbs(feesOwed.amount1(), int256(yield1), 1, "feesOwed amount1 mismatch");
 
-        //increase liquidity by 0 and see the balance increase
+        //increase liquidity by 0 and see the balance increase because the fees will be distributed
         uint256 balance0Before = poolKey.currency0.balanceOfSelf();
         uint256 balance1Before = poolKey.currency1.balanceOfSelf();
 
@@ -232,7 +234,14 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
     }
 
     function testPoolInitializationFailsIfNotFactory(uint160 sqrtPriceX96) public {
+        PoolKey memory PoolKeyNotYetInitialised = PoolKey({
+            currency0: Currency.wrap(address(vaultWrapper0)),
+            currency1: Currency.wrap(address(vaultWrapper1)),
+            fee: 500,
+            tickSpacing: 10,
+            hooks: yieldHarvestingHook
+        });
         vm.expectRevert();
-        poolManager.initialize(poolKey, sqrtPriceX96);
+        poolManager.initialize(PoolKeyNotYetInitialised, sqrtPriceX96);
     }
 }
