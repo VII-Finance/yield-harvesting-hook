@@ -47,6 +47,13 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
     ERC4626VaultWrapper public vaultWrapper0;
     ERC4626VaultWrapper public vaultWrapper1;
 
+    // For mixed pool testing (vault + raw asset)
+    MockERC20 public rawAsset;
+    MockERC4626 public mixedVault;
+    MockERC20 public mixedVaultAsset;
+    ERC4626VaultWrapper public mixedVaultWrapper;
+    PoolKey public mixedPoolKey;
+
     PoolKey public poolKey;
 
     address public poolManagerOwner = makeAddr("poolManagerOwner");
@@ -106,6 +113,28 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
             tickSpacing: 60,
             hooks: yieldHarvestingHook
         });
+
+        // Setup mixed pool (vault + raw asset)
+        rawAsset = new MockERC20();
+        mixedVaultAsset = new MockERC20();
+        mixedVault = new MockERC4626(mixedVaultAsset);
+
+        // Create pool with vault wrapper and raw asset using factory
+        mixedVaultWrapper = vaultWrappersFactory.createERC4626VaultToTokenPool(
+            IERC4626(address(mixedVault)), address(rawAsset), 3000, 60, Constants.SQRT_PRICE_1_1
+        );
+
+        // Determine currency order for mixed pool
+        Currency vaultCurrency = Currency.wrap(address(mixedVaultWrapper));
+        Currency rawCurrency = Currency.wrap(address(rawAsset));
+
+        mixedPoolKey = PoolKey({
+            currency0: address(mixedVaultWrapper) < address(rawAsset) ? vaultCurrency : rawCurrency,
+            currency1: address(mixedVaultWrapper) < address(rawAsset) ? rawCurrency : vaultCurrency,
+            fee: 3000,
+            tickSpacing: 60,
+            hooks: yieldHarvestingHook
+        });
     }
 
     function modifyLiquidity(ModifyLiquidityParams memory params, uint160 sqrtPriceX96) internal {
@@ -151,7 +180,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         params.tickLower = TickMath.minUsableTick(poolKey.tickSpacing);
         params.tickUpper = TickMath.maxUsableTick(poolKey.tickSpacing);
 
-        params.liquidityDelta = bound(0, 1, type(int128).max);
+        params.liquidityDelta = bound(params.liquidityDelta, 1, type(int120).max);
 
         (uint160 sqrtRatioX96,,,) = poolManager.getSlot0(poolKey.toId());
 
@@ -159,8 +188,8 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
         modifyLiquidity(params, sqrtRatioX96);
 
-        yield0 = bound(yield0, 1, uint128(type(int128).max));
-        yield1 = bound(yield1, 1, uint128(type(int128).max));
+        yield0 = bound(yield0, 1, 2 ** 100);
+        yield1 = bound(yield1, 1, 2 ** 100);
 
         //we mint this tokens to the underlying vaults
         asset0.mint(address(underlyingVault0), yield0);
@@ -227,6 +256,147 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
             1,
             "Balance for currency1 should increase by yield1"
         );
+    }
+
+    function modifyMixedLiquidity(ModifyLiquidityParams memory params, uint160 sqrtPriceX96) internal {
+        (uint256 amount0, uint256 amount1) = LiquidityAmounts.getAmountsForLiquidity(
+            sqrtPriceX96,
+            TickMath.getSqrtPriceAtTick(params.tickLower),
+            TickMath.getSqrtPriceAtTick(params.tickUpper),
+            uint128(uint256(params.liquidityDelta))
+        );
+
+        if (params.liquidityDelta != 0) {
+            // Add buffer for estimation inaccuracy
+            amount0 = amount0 * 2 + 2;
+            amount1 = amount1 * 2 + 2;
+
+            bool isVaultWrapper0 = Currency.unwrap(mixedPoolKey.currency0) == address(mixedVaultWrapper);
+
+            if (isVaultWrapper0) {
+                mixedVaultAsset.mint(address(this), amount0);
+                mixedVaultAsset.approve(address(mixedVault), amount0);
+                uint256 vaultShares = mixedVault.deposit(amount0, address(this));
+                mixedVault.approve(address(mixedVaultWrapper), vaultShares);
+                mixedVaultWrapper.deposit(vaultShares, address(this));
+
+                rawAsset.mint(address(this), amount1);
+
+                mixedVaultWrapper.approve(address(modifyLiquidityRouter), type(uint256).max);
+                rawAsset.approve(address(modifyLiquidityRouter), type(uint256).max);
+            } else {
+                rawAsset.mint(address(this), amount0);
+
+                mixedVaultAsset.mint(address(this), amount1);
+                mixedVaultAsset.approve(address(mixedVault), amount1);
+                uint256 vaultShares = mixedVault.deposit(amount1, address(this));
+                mixedVault.approve(address(mixedVaultWrapper), vaultShares);
+                mixedVaultWrapper.deposit(vaultShares, address(this));
+
+                rawAsset.approve(address(modifyLiquidityRouter), type(uint256).max);
+                mixedVaultWrapper.approve(address(modifyLiquidityRouter), type(uint256).max);
+            }
+        }
+
+        modifyLiquidityRouter.modifyLiquidity(mixedPoolKey, params, "");
+    }
+
+    function test_mixedPoolYieldHarvesting(ModifyLiquidityParams memory params, uint256 vaultYield) public {
+        // Test yield harvesting in a mixed pool (one vault wrapper + one raw asset)
+        // This verifies that only the vault wrapper currency generates yield while the raw asset doesn't
+
+        // Liquidity to full range to make test simpler
+        params.tickLower = TickMath.minUsableTick(mixedPoolKey.tickSpacing);
+        params.tickUpper = TickMath.maxUsableTick(mixedPoolKey.tickSpacing);
+
+        params.liquidityDelta = bound(params.liquidityDelta, 1, type(int120).max);
+
+        (uint160 sqrtRatioX96,,,) = poolManager.getSlot0(mixedPoolKey.toId());
+
+        params = createFuzzyLiquidityParams(mixedPoolKey, params, sqrtRatioX96);
+
+        modifyMixedLiquidity(params, sqrtRatioX96);
+
+        vaultYield = bound(vaultYield, 1, 2 ** 100);
+
+        // Generate yield by minting tokens to the underlying vault
+        mixedVaultAsset.mint(address(mixedVault), vaultYield);
+
+        // Record initial balances
+        uint256 poolManagerBalance0Before = mixedPoolKey.currency0.balanceOf(address(poolManager));
+        uint256 poolManagerBalance1Before = mixedPoolKey.currency1.balanceOf(address(poolManager));
+
+        // Determine which currency is the vault wrapper
+        bool isVaultWrapper0 = Currency.unwrap(mixedPoolKey.currency0) == address(mixedVaultWrapper);
+
+        // Do a small swap to trigger harvest
+        SwapParams memory swapParams = SwapParams({
+            zeroForOne: true,
+            amountSpecified: -int256(1),
+            sqrtPriceLimitX96: TickMath.getSqrtPriceAtTick(params.tickLower) + 1
+        });
+
+        mixedVaultWrapper.approve(address(swapRouter), type(uint256).max);
+        rawAsset.approve(address(swapRouter), type(uint256).max);
+        swapRouter.swap(
+            mixedPoolKey, swapParams, PoolSwapTest.TestSettings({takeClaims: true, settleUsingBurn: false}), ""
+        );
+
+        // Check that yield was harvested for the vault wrapper currency only
+        if (isVaultWrapper0) {
+            // Vault wrapper is currency0, should have yield
+            assertApproxEqAbs(
+                mixedPoolKey.currency0.balanceOf(address(poolManager)) - poolManagerBalance0Before,
+                vaultYield,
+                1,
+                "PoolManager balance for vault wrapper currency should increase by yield"
+            );
+            assertApproxEqAbs(
+                mixedPoolKey.currency1.balanceOf(address(poolManager)) - poolManagerBalance1Before,
+                0,
+                1,
+                "PoolManager balance for raw asset currency should not change from yield"
+            );
+        } else {
+            // Raw asset is currency0, should have minimal change (only from swap, not yield)
+            assertApproxEqAbs(
+                mixedPoolKey.currency0.balanceOf(address(poolManager)) - poolManagerBalance0Before,
+                0,
+                1,
+                "PoolManager balance for raw asset currency should not change from yield"
+            );
+            // Vault wrapper is currency1, should have yield
+            assertApproxEqAbs(
+                mixedPoolKey.currency1.balanceOf(address(poolManager)) - poolManagerBalance1Before,
+                vaultYield,
+                1,
+                "PoolManager balance for vault wrapper currency should increase by yield"
+            );
+        }
+
+        // Verify fees are distributed correctly by modifying liquidity with 0 delta
+        PositionConfig memory config = PositionConfig({
+            poolKey: mixedPoolKey,
+            tickLower: params.tickLower,
+            tickUpper: params.tickUpper,
+            salt: params.salt
+        });
+
+        BalanceDelta feesOwed = FeeMath.getFeesOwed(poolManager, config, address(modifyLiquidityRouter));
+
+        if (isVaultWrapper0) {
+            assertApproxEqAbs(feesOwed.amount0(), int256(vaultYield), 1, "feesOwed amount0 should match vault yield");
+            // Raw asset should have minimal fees (only from swap, not yield)
+            int128 rawFees = feesOwed.amount1();
+            uint256 absRawFees = rawFees >= 0 ? uint256(int256(rawFees)) : uint256(int256(-rawFees));
+            assertLt(absRawFees, 10, "feesOwed amount1 should be minimal for raw asset");
+        } else {
+            // Raw asset should have minimal fees (only from swap, not yield)
+            int128 rawFees = feesOwed.amount0();
+            uint256 absRawFees = rawFees >= 0 ? uint256(int256(rawFees)) : uint256(int256(-rawFees));
+            assertLt(absRawFees, 10, "feesOwed amount0 should be minimal for raw asset");
+            assertApproxEqAbs(feesOwed.amount1(), int256(vaultYield), 1, "feesOwed amount1 should match vault yield");
+        }
     }
 
     function testPoolInitializationFailsIfNotFactory(uint160 sqrtPriceX96) public {
