@@ -8,7 +8,6 @@ sequenceDiagram
     participant PositionManager as Position Manager
     participant PoolManager as Pool Manager
     participant YieldHook as Yield Harvesting Hook
-    participant Pool as WETH/USDC Pool (0.05%, tick=10)
     participant ExistingLPs as Existing Liquidity Providers
 
     Note over User: User wants to add liquidity ETH/USDC pool while earning interest from lending protocol x
@@ -51,43 +50,33 @@ sequenceDiagram
             PoolManager->>YieldHook: beforeAddLiquidity(poolKey)
 
             YieldHook->>VIIWrapperWETH: pendingYield()
-            VIIWrapperWETH-->>YieldHook: 12 WETH worth of yield (from share price appreciation)
+            VIIWrapperWETH-->>YieldHook: 0.1 WETH worth of interest accrued
 
             YieldHook->>VIIWrapperUSDC: pendingYield()
-            VIIWrapperUSDC-->>YieldHook: 15,000 USDC worth of yield (from share price appreciation)
+            VIIWrapperUSDC-->>YieldHook: 100 USDC worth of interest accrued
 
-            alt Yield Available
-                YieldHook->>PoolManager: donate(poolKey, 12 WETH, 15000 USDC)
-                PoolManager->>Pool: Add yield to reserves
-                Pool-->>ExistingLPs: Yield distributed to existing LPs
-                Note over ExistingLPs: Existing LPs benefit from harvested yield
-                Note over User: New user does NOT get this yield (prevents JIT attacks)
+            alt If non zero interest has accrued
+                Note over ExistingLPs: Existing Active LPs benefit from harvested interest yield
+                Note over User: New Liquidity Provider does NOT get benefit from the interest accrued so far (prevents JIT Liquidity attacks)
 
-                YieldHook->>VIIWrapperWETH: harvest() - collect the yield
-                YieldHook->>VIIWrapperUSDC: harvest() - collect the yield
+            
+    
+                YieldHook->>PoolManager: donate(VII-xWETH/VII-XUSDC 0.05% poolKey, 0.01 WETH, 100 USDC)
+    
+                YieldHook->>VIIWrapperWETH: harvest(poolManager) 
+                VIIWrapperWETH-->>PoolManager:  mint 0.01 VII-xWETH equal to the pendingYield and send to the PoolManager and settle the donation
+                YieldHook->>VIIWrapperUSDC: harvest(poolManager)
+                VIIWrapperUSDC-->>PoolManager: mint 100 VII-xUSDC equal to the pendingYield and send to the PoolManager and settle the donation
+    
+          
+    
+                YieldHook-->>PoolManager: beforeAddLiquidity complete
             end
-
-            YieldHook-->>PoolManager: beforeAddLiquidity complete
         end
 
         %% Step 5: Actual Liquidity Addition
-        PoolManager->>Pool: Add user's liquidity (1000 VII-xWETH, 2M VII-xUSDC)
-        Pool-->>User: Receive LP tokens representing position
+        PoolManager->>PoolManager: Add user's liquidity (1000 VII-xWETH, 2M VII-xUSDC)
         PoolManager-->>PositionManager: Liquidity added successfully
-        PositionManager-->>User: Position created, LP tokens received
+        PositionManager-->>User: Position created, Liquidity Positiion NFT received
     end
-
-    %% Step 6: Ongoing Yield Accrual
-    rect rgb(248, 248, 255)
-        Note over VIIWrapperWETH, Pool: Ongoing Yield Accrual
-        loop Every block
-            LendingProtocolX->>VIIWrapperWETH: xWETH share price increases (yield accrual)
-            LendingProtocolX->>VIIWrapperUSDC: xUSDC share price increases (yield accrual)
-            Note over VIIWrapperWETH, VIIWrapperUSDC: Yield accumulates as share price grows
-        end
-
-        Note over Pool: Next user interaction will trigger harvest
-        Note over User: User now earns from:<br/>1. Trading fees (Uniswap)<br/>2. Harvested yield (ERC4626 vault appreciation)<br/>3. VII protocol may take small fee
-    end
-
 ```
