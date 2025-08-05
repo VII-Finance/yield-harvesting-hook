@@ -65,7 +65,7 @@ contract ERC4626VaultWrapper is BaseVaultWrapper {
         return Math.min(underlyingVault().maxWithdraw(address(this)), balanceOf(owner));
     }
 
-    function _maxWithdrawableAssets() internal view override returns (uint256) {
-        return underlyingVault().maxWithdraw(address(this));
+    function _getMaxWithdrawableUnderlyingAssets() internal view override returns (uint256) {
+        return underlyingVault().previewRedeem(totalAssets());
     }
 }
