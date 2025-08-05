@@ -8,7 +8,6 @@ solc = "0.8.26"
 evm_version = "cancun"
 bytecode_hash = "none"
 cbor_metadata = false
-always_use_create_2_factory = true
 
 [fuzz]
 runs = 10_000

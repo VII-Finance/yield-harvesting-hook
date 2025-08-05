@@ -17,6 +17,7 @@ import {LiquidityAmounts} from "lib/v4-periphery/lib/v4-core/test/utils/Liquidit
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {Fuzzers} from "lib/v4-periphery/lib/v4-core/src/test/Fuzzers.sol";
 import {CustomRevert} from "lib/v4-periphery/lib/v4-core/src/libraries/CustomRevert.sol";
+import {HookMiner} from "lib/v4-periphery/src/utils/HookMiner.sol";
 
 import {YieldHarvestingHook} from "src/YieldHarvestingHook.sol";
 import {ERC4626VaultWrapperFactory} from "src/ERC4626VaultWrapperFactory.sol";
@@ -31,7 +32,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
     using StateLibrary for PoolManager;
 
     address aavePool = makeAddr("AavePool");
-    address vaultFactoryOwner = makeAddr("VaultFactoryOwner");
+    address factoryOwner = makeAddr("factoryOwner");
     PoolManager public poolManager;
     YieldHarvestingHook public yieldHarvestingHook;
     ERC4626VaultWrapperFactory public vaultWrappersFactory;
@@ -49,8 +50,9 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
     PoolKey public poolKey;
 
     address public poolManagerOwner = makeAddr("poolManagerOwner");
-    uint160 hookPermissionCount = 14;
-    uint160 clearAllHookPermissionsMask = ~uint160(0) << (hookPermissionCount);
+
+    uint160 constant HOOK_PERMISSIONS = uint160(Hooks.BEFORE_INITIALIZE_FLAG) | uint160(Hooks.BEFORE_SWAP_FLAG)
+        | uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG) | uint160(Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG);
 
     function setUp() public {
         poolManager = new PoolManager(poolManagerOwner);
@@ -58,20 +60,14 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         modifyLiquidityRouter = new PoolModifyLiquidityTest(poolManager);
         swapRouter = new PoolSwapTest(poolManager);
 
-        yieldHarvestingHook = YieldHarvestingHook(
-            payable(
-                address(
-                    uint160(
-                        type(uint160).max & clearAllHookPermissionsMask | Hooks.BEFORE_INITIALIZE_FLAG
-                            | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
-                    )
-                )
-            )
+        (, bytes32 salt) = HookMiner.find(
+            address(this),
+            HOOK_PERMISSIONS,
+            type(YieldHarvestingHook).creationCode,
+            abi.encode(factoryOwner, poolManager)
         );
 
-        deployCodeTo(
-            "YieldHarvestingHook", abi.encode(vaultFactoryOwner, poolManager, aavePool), address(yieldHarvestingHook)
-        );
+        yieldHarvestingHook = new YieldHarvestingHook{salt: salt}(factoryOwner, poolManager);
 
         vaultWrappersFactory = ERC4626VaultWrapperFactory(yieldHarvestingHook.erc4626VaultWrapperFactory());
 
