@@ -49,7 +49,7 @@ abstract contract BaseVaultWrapper is ERC4626, IVaultWrapper {
         return address(bytes20(LibClone.argsOnClone(address(this), start, end)));
     }
 
-    function _maxWithdrawableAssets() internal view virtual returns (uint256);
+    function _getMaxWithdrawableUnderlyingAssets() internal view virtual returns (uint256);
 
     function name() public view override(ERC20, IERC20Metadata) returns (string memory) {
         return string(abi.encodePacked("VII Finance Wrapped ", ERC20(getUnderlyingVault()).name()));
@@ -87,10 +87,10 @@ abstract contract BaseVaultWrapper is ERC4626, IVaultWrapper {
     }
 
     function totalPendingYield() public view returns (uint256) {
-        uint256 maxWithdrawableAssets = _maxWithdrawableAssets();
+        uint256 maxWithdrawableUnderlyingAssets = _getMaxWithdrawableUnderlyingAssets();
         uint256 currentSupply = totalSupply();
-        if (maxWithdrawableAssets > currentSupply) {
-            return maxWithdrawableAssets - currentSupply;
+        if (maxWithdrawableUnderlyingAssets > currentSupply) {
+            return maxWithdrawableUnderlyingAssets - currentSupply;
         }
         return 0;
     }

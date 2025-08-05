@@ -111,7 +111,7 @@ contract AaveWrapper is BaseVaultWrapper {
         }
     }
 
-    function _maxWithdrawableAssets() internal view override returns (uint256) {
-        return Math.min(_maxAssetsWithdrawableFromAave(), underlyingAToken().balanceOf(address(this)));
+    function _getMaxWithdrawableUnderlyingAssets() internal view override returns (uint256) {
+        return underlyingAToken().balanceOf(address(this));
     }
 }
