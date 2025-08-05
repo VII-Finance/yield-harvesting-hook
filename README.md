@@ -26,7 +26,7 @@ src/
 
 ```solidity
 // Create a pool between VII-wrapped xWETH and VII-wrapped xUSDC
-factory.createERC4626VaultPair(
+factory.createERC4626VaultPool(
     IERC4626(xWETH),     // First vault
     IERC4626(xUSDC),     // Second vault
     500,                 // 0.05% fee
