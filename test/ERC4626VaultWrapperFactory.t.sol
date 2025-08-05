@@ -16,6 +16,7 @@ import {PoolManager} from "@uniswap/v4-core/src/PoolManager.sol";
 import {YieldHarvestingHook} from "src/YieldHarvestingHook.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {LibClone} from "lib/solady/src/utils/LibClone.sol";
+import {HookMiner} from "lib/v4-periphery/src/utils/HookMiner.sol";
 
 contract MockAToken {
     function UNDERLYING_ASSET_ADDRESS() external pure returns (address) {
@@ -74,21 +75,23 @@ contract ERC4626VaultWrapperFactoryTest is Test {
     int24 constant TICK_SPACING = 60;
     uint160 constant SQRT_PRICE_X96 = 79228162514264337593543950336; // 1:1 price
 
+    uint160 constant HOOK_PERMISSIONS = uint160(Hooks.BEFORE_INITIALIZE_FLAG) | uint160(Hooks.BEFORE_SWAP_FLAG)
+        | uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG) | uint160(Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG);
+
     event PoolInitialized(PoolKey key, uint160 sqrtPriceX96, int24 tick);
 
     function setUp() public {
-        yieldHarvestingHook = YieldHarvestingHook(
-            payable(
-                address(
-                    uint160(
-                        type(uint160).max & clearAllHookPermissionsMask | Hooks.BEFORE_INITIALIZE_FLAG
-                            | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
-                    )
-                )
-            )
+        poolManager = new PoolManager(poolManagerOwner);
+
+        (, bytes32 salt) = HookMiner.find(
+            address(this),
+            HOOK_PERMISSIONS,
+            type(YieldHarvestingHook).creationCode,
+            abi.encode(factoryOwner, poolManager)
         );
 
-        poolManager = new PoolManager(poolManagerOwner);
+        yieldHarvestingHook = new YieldHarvestingHook{salt: salt}(factoryOwner, poolManager);
+
         tokenA = makeAddr("tokenA");
         tokenB = makeAddr("tokenB");
         vaultA = new MockERC4626();
@@ -96,8 +99,6 @@ contract ERC4626VaultWrapperFactoryTest is Test {
 
         aTokenA = new MockAToken();
         aTokenB = new MockAToken();
-
-        deployCodeTo("YieldHarvestingHook", abi.encode(factoryOwner, poolManager), address(yieldHarvestingHook));
 
         factory = ERC4626VaultWrapperFactory(yieldHarvestingHook.erc4626VaultWrapperFactory());
     }
