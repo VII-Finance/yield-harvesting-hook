@@ -5,16 +5,7 @@ import {ERC4626VaultWrapperTest} from "test/ERC4626VaultWrapper.t.sol";
 import {AaveWrapper} from "src/VaultWrappers/AaveWrapper.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {LibClone} from "lib/solady/src/utils/LibClone.sol";
-
-contract MockAaveWrapper is AaveWrapper {
-    function _maxAssetsSuppliableToAave() internal pure override returns (uint256) {
-        return type(uint256).max;
-    }
-
-    function _maxAssetsWithdrawableFromAave() internal pure override returns (uint256) {
-        return type(uint256).max;
-    }
-}
+import {MockAaveWrapper} from "test/utils/MockAaveWrapper.sol";
 
 //It tests ERC4626ness of AaveWrapper
 //It's simple, just returns 1:1 every time

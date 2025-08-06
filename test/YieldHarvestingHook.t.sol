@@ -22,11 +22,27 @@ import {HookMiner} from "lib/v4-periphery/src/utils/HookMiner.sol";
 import {YieldHarvestingHook} from "src/YieldHarvestingHook.sol";
 import {ERC4626VaultWrapperFactory} from "src/ERC4626VaultWrapperFactory.sol";
 import {ERC4626VaultWrapper} from "src/VaultWrappers/ERC4626VaultWrapper.sol";
+import {BaseVaultWrapper} from "src/VaultWrappers/Base/BaseVaultWrapper.sol";
 import {MockERC4626} from "test/utils/MockERC4626.sol";
 import {MockERC20} from "test/utils/MockERC20.sol";
 import {FeeMath, PositionConfig} from "test/utils/libraries/FeeMath.sol";
 import {IERC4626} from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import {Constants} from "@uniswap/v4-core/test/utils/Constants.sol";
+import {MockAaveWrapper} from "test/utils/MockAaveWrapper.sol";
+
+contract MockERC4626VaultWrapperFactory is ERC4626VaultWrapperFactory {
+    constructor(address _owner, PoolManager _manager, address _yieldHarvestingHook)
+        ERC4626VaultWrapperFactory(_owner, _manager, _yieldHarvestingHook)
+    {
+        aaveWrapperImplementation = address(new MockAaveWrapper());
+    }
+}
+
+contract MockYieldHarvestingHook is YieldHarvestingHook {
+    constructor(address _owner, PoolManager _manager) YieldHarvestingHook(_owner, _manager) {
+        erc4626VaultWrapperFactory = address(new MockERC4626VaultWrapperFactory(_owner, _manager, address(this)));
+    }
+}
 
 contract YieldHarvestingHookTest is Fuzzers, Test {
     using StateLibrary for PoolManager;
@@ -44,14 +60,14 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
     MockERC4626 public underlyingVault1;
     MockERC20 public asset0;
     MockERC20 public asset1;
-    ERC4626VaultWrapper public vaultWrapper0;
-    ERC4626VaultWrapper public vaultWrapper1;
+    BaseVaultWrapper public vaultWrapper0;
+    BaseVaultWrapper public vaultWrapper1;
 
     // For mixed pool testing (vault + raw asset)
     MockERC20 public rawAsset;
     MockERC4626 public mixedVault;
     MockERC20 public mixedVaultAsset;
-    ERC4626VaultWrapper public mixedVaultWrapper;
+    BaseVaultWrapper public mixedVaultWrapper;
     PoolKey public mixedPoolKey;
 
     PoolKey public poolKey;
@@ -60,6 +76,8 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
     uint160 constant HOOK_PERMISSIONS = uint160(Hooks.BEFORE_INITIALIZE_FLAG) | uint160(Hooks.BEFORE_SWAP_FLAG)
         | uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG) | uint160(Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG);
+
+    bool isAaveWrapperTest;
 
     function setUp() public {
         poolManager = new PoolManager(poolManagerOwner);
@@ -70,23 +88,40 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         (, bytes32 salt) = HookMiner.find(
             address(this),
             HOOK_PERMISSIONS,
-            type(YieldHarvestingHook).creationCode,
+            type(MockYieldHarvestingHook).creationCode,
             abi.encode(factoryOwner, poolManager)
         );
 
-        yieldHarvestingHook = new YieldHarvestingHook{salt: salt}(factoryOwner, poolManager);
+        yieldHarvestingHook = new MockYieldHarvestingHook{salt: salt}(factoryOwner, poolManager);
 
         vaultWrappersFactory = ERC4626VaultWrapperFactory(yieldHarvestingHook.erc4626VaultWrapperFactory());
+    }
+
+    function setUpVaults(bool _isAaveWrapperTest) public {
+        isAaveWrapperTest = _isAaveWrapperTest;
 
         MockERC20 assetA = new MockERC20();
         MockERC4626 underlyingVaultA = new MockERC4626(assetA);
 
         MockERC20 assetB = new MockERC20();
         MockERC4626 underlyingVaultB = new MockERC4626(assetB);
-        (ERC4626VaultWrapper vaultWrapperA, ERC4626VaultWrapper vaultWrapperB) = vaultWrappersFactory
-            .createERC4626VaultPool(
-            IERC4626(address(underlyingVaultA)), IERC4626(address(underlyingVaultB)), 3000, 60, Constants.SQRT_PRICE_1_1
-        );
+
+        BaseVaultWrapper vaultWrapperA;
+        BaseVaultWrapper vaultWrapperB;
+
+        if (isAaveWrapperTest) {
+            (vaultWrapperA, vaultWrapperB) = vaultWrappersFactory.createAavePool(
+                (address(underlyingVaultA)), (address(underlyingVaultB)), 3000, 60, Constants.SQRT_PRICE_1_1
+            );
+        } else {
+            (vaultWrapperA, vaultWrapperB) = vaultWrappersFactory.createERC4626VaultPool(
+                IERC4626(address(underlyingVaultA)),
+                IERC4626(address(underlyingVaultB)),
+                3000,
+                60,
+                Constants.SQRT_PRICE_1_1
+            );
+        }
         // Compare vaultWrapper addresses and assign 0/1 based on which is lower
         if (address(vaultWrapperA) < address(vaultWrapperB)) {
             asset0 = assetA;
@@ -120,9 +155,16 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         mixedVault = new MockERC4626(mixedVaultAsset);
 
         // Create pool with vault wrapper and raw asset using factory
-        mixedVaultWrapper = vaultWrappersFactory.createERC4626VaultToTokenPool(
-            IERC4626(address(mixedVault)), address(rawAsset), 3000, 60, Constants.SQRT_PRICE_1_1
-        );
+
+        if (isAaveWrapperTest) {
+            mixedVaultWrapper = vaultWrappersFactory.createAaveToTokenPool(
+                address(mixedVault), address(rawAsset), 3000, 60, Constants.SQRT_PRICE_1_1
+            );
+        } else {
+            mixedVaultWrapper = vaultWrappersFactory.createERC4626VaultToTokenPool(
+                IERC4626(address(mixedVault)), address(rawAsset), 3000, 60, Constants.SQRT_PRICE_1_1
+            );
+        }
 
         // Determine currency order for mixed pool
         Currency vaultCurrency = Currency.wrap(address(mixedVaultWrapper));
@@ -173,9 +215,13 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         modifyLiquidityRouter.modifyLiquidity(poolKey, params, "");
     }
 
-    function test_yieldAndHarvestBeforeSwap(ModifyLiquidityParams memory params, uint256 yield0, uint256 yield1)
-        public
-    {
+    function test_yieldAndHarvestBeforeSwap(
+        ModifyLiquidityParams memory params,
+        uint256 yield0,
+        uint256 yield1,
+        bool isAaveWrapper
+    ) public {
+        setUpVaults(isAaveWrapper);
         //liquidity to full range to make test simpler
         params.tickLower = TickMath.minUsableTick(poolKey.tickSpacing);
         params.tickUpper = TickMath.maxUsableTick(poolKey.tickSpacing);
@@ -192,8 +238,19 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         yield1 = bound(yield1, 1, 2 ** 100);
 
         //we mint this tokens to the underlying vaults
-        asset0.mint(address(underlyingVault0), yield0);
-        asset1.mint(address(underlyingVault1), yield1);
+        if (isAaveWrapperTest) {
+            asset0.mint(address(this), yield0);
+            asset1.mint(address(this), yield1);
+
+            asset0.approve(address(underlyingVault0), yield0);
+            asset1.approve(address(underlyingVault1), yield1);
+
+            underlyingVault0.deposit(yield0, address(vaultWrapper0));
+            underlyingVault1.deposit(yield1, address(vaultWrapper1));
+        } else {
+            asset0.mint(address(underlyingVault0), yield0);
+            asset1.mint(address(underlyingVault1), yield1);
+        }
 
         //make sure poolManager balance has increased
         uint256 poolManagerBalance0Before = poolKey.currency0.balanceOf(address(poolManager));
@@ -301,7 +358,10 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         modifyLiquidityRouter.modifyLiquidity(mixedPoolKey, params, "");
     }
 
-    function test_mixedPoolYieldHarvesting(ModifyLiquidityParams memory params, uint256 vaultYield) public {
+    function test_mixedPoolYieldHarvesting(ModifyLiquidityParams memory params, uint256 vaultYield, bool isAaveWrapper)
+        public
+    {
+        setUpVaults(isAaveWrapper);
         // Test yield harvesting in a mixed pool (one vault wrapper + one raw asset)
         // This verifies that only the vault wrapper currency generates yield while the raw asset doesn't
 
@@ -320,7 +380,13 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         vaultYield = bound(vaultYield, 1, 2 ** 100);
 
         // Generate yield by minting tokens to the underlying vault
-        mixedVaultAsset.mint(address(mixedVault), vaultYield);
+        if (isAaveWrapperTest) {
+            mixedVaultAsset.mint(address(this), vaultYield);
+            mixedVaultAsset.approve(address(mixedVault), vaultYield);
+            mixedVault.deposit(vaultYield, address(mixedVaultWrapper));
+        } else {
+            mixedVaultAsset.mint(address(mixedVault), vaultYield);
+        }
 
         // Record initial balances
         uint256 poolManagerBalance0Before = mixedPoolKey.currency0.balanceOf(address(poolManager));
@@ -399,7 +465,9 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         }
     }
 
-    function testPoolInitializationFailsIfNotFactory(uint160 sqrtPriceX96) public {
+    function testPoolInitializationFailsIfNotFactory(uint160 sqrtPriceX96, bool isAaveWrapper) public {
+        setUpVaults(isAaveWrapper);
+
         PoolKey memory PoolKeyNotYetInitialised = PoolKey({
             currency0: Currency.wrap(address(vaultWrapper0)),
             currency1: Currency.wrap(address(vaultWrapper1)),
