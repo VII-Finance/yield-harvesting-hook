@@ -143,7 +143,10 @@ contract ERC4626VaultWrapperFactory is Ownable {
         _initializePool(address(aaveWrapperA), address(aaveWrapperB), fee, tickSpacing, sqrtPriceX96);
     }
 
-    function configureWrapperFees(address vaultWrapper, uint256 feeDivisor, address feeReceiver) external onlyOwner {
+    function setWrapperFeeParameters(address vaultWrapper, uint256 feeDivisor, address feeReceiver)
+        external
+        onlyOwner
+    {
         BaseVaultWrapper(vaultWrapper).setFeeParameters(feeDivisor, feeReceiver);
     }
 
