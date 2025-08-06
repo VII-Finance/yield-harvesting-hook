@@ -124,8 +124,16 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         isAaveWrapperTest = _isAaveWrapperTest;
 
         (MockERC4626 underlyingVaultA, MockERC4626 underlyingVaultB) = _getUnderlyingVaults();
-        MockERC20 assetA = MockERC20(address(underlyingVaultA.asset()));
-        MockERC20 assetB = MockERC20(address(underlyingVaultB.asset()));
+        MockERC20 assetA;
+        MockERC20 assetB;
+
+        if (isAaveWrapperTest) {
+            assetA = MockERC20(underlyingVaultA.UNDERLYING_ASSET_ADDRESS());
+            assetB = MockERC20(underlyingVaultB.UNDERLYING_ASSET_ADDRESS());
+        } else {
+            assetA = MockERC20(address(underlyingVaultA.asset()));
+            assetB = MockERC20(address(underlyingVaultB.asset()));
+        }
 
         BaseVaultWrapper vaultWrapperA;
         BaseVaultWrapper vaultWrapperB;
@@ -172,7 +180,11 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
         // Setup mixed pool (vault + raw asset)
         (mixedVault, rawAsset) = _getMixedAssetsInfo();
-        mixedVaultAsset = MockERC20(address(mixedVault.asset()));
+        if (isAaveWrapperTest) {
+            mixedVaultAsset = MockERC20(mixedVault.UNDERLYING_ASSET_ADDRESS());
+        } else {
+            mixedVaultAsset = MockERC20(address(mixedVault.asset()));
+        }
 
         // Create pool with vault wrapper and raw asset using factory
 
@@ -212,14 +224,8 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
             amount0 = amount0 * 2 + 10;
             amount1 = amount1 * 2 + 10;
 
-            deal(address(asset0), address(this), amount0);
-            deal(address(asset1), address(this), amount1);
-
-            asset0.approve(address(underlyingVault0), amount0);
-            asset1.approve(address(underlyingVault1), amount1);
-
-            uint256 underlyingVaultShares0 = underlyingVault0.deposit(amount0, address(this));
-            uint256 underlyingVaultShares1 = underlyingVault1.deposit(amount1, address(this));
+            uint256 underlyingVaultShares0 = _deposit(underlyingVault0, amount0, address(this));
+            uint256 underlyingVaultShares1 = _deposit(underlyingVault1, amount1, address(this));
 
             underlyingVault0.approve(address(vaultWrapper0), underlyingVaultShares0);
             underlyingVault1.approve(address(vaultWrapper1), underlyingVaultShares1);
@@ -235,20 +241,22 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         modifyLiquidityRouter.modifyLiquidity(poolKey, params, "");
     }
 
+    function _deposit(MockERC4626 vault, uint256 amount, address to) internal virtual returns (uint256) {
+        //assume this address has the necessary amount of tokens
+        deal(address(vault.asset()), address(this), amount);
+
+        vault.asset().approve(address(vault), amount);
+        return vault.deposit(amount, to);
+    }
+
     function _mintYieldToVaults(uint256 yield0, uint256 yield1) internal virtual returns (uint256, uint256) {
         yield0 = bound(yield0, 1, 2 ** 100);
         yield1 = bound(yield1, 1, 2 ** 100);
 
         //we mint this tokens to the underlying vaults
         if (isAaveWrapperTest) {
-            asset0.mint(address(this), yield0);
-            asset1.mint(address(this), yield1);
-
-            asset0.approve(address(underlyingVault0), yield0);
-            asset1.approve(address(underlyingVault1), yield1);
-
-            underlyingVault0.deposit(yield0, address(vaultWrapper0));
-            underlyingVault1.deposit(yield1, address(vaultWrapper1));
+            _deposit(underlyingVault0, yield0, address(vaultWrapper0));
+            _deposit(underlyingVault1, yield1, address(vaultWrapper1));
         } else {
             asset0.mint(address(underlyingVault0), yield0);
             asset1.mint(address(underlyingVault1), yield1);
@@ -357,23 +365,18 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
             bool isVaultWrapper0 = Currency.unwrap(mixedPoolKey.currency0) == address(mixedVaultWrapper);
 
             if (isVaultWrapper0) {
-                deal(address(mixedVaultAsset), address(this), amount0);
-
-                mixedVaultAsset.approve(address(mixedVault), amount0);
-                uint256 vaultShares = mixedVault.deposit(amount0, address(this));
+                uint256 vaultShares = _deposit(mixedVault, amount0, address(this));
                 mixedVault.approve(address(mixedVaultWrapper), vaultShares);
                 mixedVaultWrapper.deposit(vaultShares, address(this));
 
-                rawAsset.mint(address(this), amount1);
+                deal(address(rawAsset), address(this), amount1);
 
                 mixedVaultWrapper.approve(address(modifyLiquidityRouter), type(uint256).max);
                 rawAsset.approve(address(modifyLiquidityRouter), type(uint256).max);
             } else {
                 deal(address(rawAsset), address(this), amount0);
 
-                deal(address(mixedVaultAsset), address(this), amount1);
-                mixedVaultAsset.approve(address(mixedVault), amount1);
-                uint256 vaultShares = mixedVault.deposit(amount1, address(this));
+                uint256 vaultShares = _deposit(mixedVault, amount1, address(this));
                 mixedVault.approve(address(mixedVaultWrapper), vaultShares);
                 mixedVaultWrapper.deposit(vaultShares, address(this));
 
@@ -390,9 +393,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
         //we mint this tokens to the underlying vault
         if (isAaveWrapperTest) {
-            mixedVaultAsset.mint(address(this), vaultYield);
-            mixedVaultAsset.approve(address(mixedVault), vaultYield);
-            mixedVault.deposit(vaultYield, address(mixedVaultWrapper));
+            _deposit(mixedVault, vaultYield, address(mixedVaultWrapper));
         } else {
             mixedVaultAsset.mint(address(mixedVault), vaultYield);
         }
