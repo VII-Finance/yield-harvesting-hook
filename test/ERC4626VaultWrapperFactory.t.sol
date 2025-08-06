@@ -293,20 +293,20 @@ contract ERC4626VaultWrapperFactoryTest is Test {
         aaveWrapper.setFeeParameters(20, makeAddr("feeReceiver"));
 
         vm.expectRevert();
-        factory.configureWrapperFees(address(aaveWrapper), 20, makeAddr("feeReceiver"));
+        factory.setWrapperFeeParameters(address(aaveWrapper), 20, makeAddr("feeReceiver"));
 
         //setting fee divisor less than 14 should fail
         //this means the max fees that owner can take is 7.14%
         //and they can only get fees 1/14 = 7.14% 1/15 = 6.67%, 1/16 = 6.25% etc.
         vm.expectRevert(BaseVaultWrapper.InvalidFeeParams.selector);
         vm.startPrank(factoryOwner);
-        factory.configureWrapperFees(address(aaveWrapper), 13, makeAddr("feeReceiver"));
+        factory.setWrapperFeeParameters(address(aaveWrapper), 13, makeAddr("feeReceiver"));
 
-        factory.configureWrapperFees(address(aaveWrapper), 14, makeAddr("feeReceiver"));
+        factory.setWrapperFeeParameters(address(aaveWrapper), 14, makeAddr("feeReceiver"));
         assertEq(aaveWrapper.feeDivisor(), 14);
         assertEq(aaveWrapper.feeReceiver(), makeAddr("feeReceiver"));
 
-        factory.configureWrapperFees(address(vaultWrapper), 14, makeAddr("feeReceiver"));
+        factory.setWrapperFeeParameters(address(vaultWrapper), 14, makeAddr("feeReceiver"));
         assertEq(vaultWrapper.feeDivisor(), 14);
         assertEq(vaultWrapper.feeReceiver(), makeAddr("feeReceiver"));
 
