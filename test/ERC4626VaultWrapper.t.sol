@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {ERC4626VaultWrapper} from "src/VaultWrappers/ERC4626VaultWrapper.sol";
+import {BaseVaultWrapper} from "src/VaultWrappers/Base/BaseVaultWrapper.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {ERC4626} from "solmate/src/mixins/ERC4626.sol";
 import {ERC4626Test} from "erc4626-tests/ERC4626.test.sol";
@@ -33,6 +34,10 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
             abi.encodePacked(address(this), harvester, address(underlyingVault)),
             keccak256(abi.encodePacked(address(underlyingVault)))
         );
+
+        assertEq(ERC4626VaultWrapper(_vault_).getFactory(), address(this));
+        assertEq(ERC4626VaultWrapper(_vault_).getYieldHarvestingHook(), harvester);
+        assertEq(ERC4626VaultWrapper(_vault_).getUnderlyingVault(), address(underlyingVault));
 
         _delta_ = 0;
         _vaultMayBeEmpty = false;
@@ -94,6 +99,10 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
                 uint256 feeReceiverBalanceBefore = ERC20(_vault_).balanceOf(feeReceiver);
 
                 uint256 totalPendingYield = ERC4626VaultWrapper(_vault_).totalPendingYield();
+
+                // if not harvester than harvest call should fail
+                vm.expectRevert(BaseVaultWrapper.NotYieldHarvester.selector);
+                ERC4626VaultWrapper(_vault_).harvest(harvestReceiver);
 
                 vm.prank(harvester);
                 (uint256 actualHarvestedAssets, uint256 actualFees) =

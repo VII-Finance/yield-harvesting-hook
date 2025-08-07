@@ -60,7 +60,7 @@ abstract contract BaseVaultWrapper is ERC4626, IVaultWrapper {
     }
 
     function decimals() public view override returns (uint8) {
-        return ERC20(getUnderlyingVault()).decimals();
+        return IERC20Metadata(getUnderlyingVault()).decimals();
     }
 
     function asset() public view override returns (address) {
@@ -71,6 +71,7 @@ abstract contract BaseVaultWrapper is ERC4626, IVaultWrapper {
         if (_msgSender() != getFactory()) revert NotFactory();
         if (_feeDivisor != 0 && _feeDivisor < MIN_FEE_DIVISOR) revert InvalidFeeParams();
         if (_feeReceiver == address(0)) revert InvalidFeeParams();
+
         feeDivisor = _feeDivisor;
         feeReceiver = _feeReceiver;
 
