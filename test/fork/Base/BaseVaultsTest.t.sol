@@ -3,6 +3,8 @@ pragma solidity ^0.8.13;
 
 import {YieldHarvestingHookTest} from "test/YieldHarvestingHook.t.sol";
 import {PoolManager} from "@uniswap/v4-core/src/PoolManager.sol";
+import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 
 contract BaseVaultsTest is YieldHarvestingHookTest {
     address POOL_MANAGER = 0x000000000004444c5dc75cB358380D2e3dE08A90;
@@ -35,6 +37,11 @@ contract BaseVaultsTest is YieldHarvestingHookTest {
         (vaultYield,) = mixedVaultWrapper.pendingYield();
 
         return vaultYield;
+    }
+
+    function _getCurrentPrice(bytes32 _poolId) internal view returns (uint160) {
+        (uint160 sqrtPriceX96,,,) = StateLibrary.getSlot0(poolManager, PoolId.wrap(_poolId));
+        return sqrtPriceX96;
     }
 
     receive() external payable {

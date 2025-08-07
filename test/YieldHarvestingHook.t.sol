@@ -120,6 +120,10 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         return (vault, anotherAsset);
     }
 
+    function _getInitialPrice() internal virtual returns (uint160) {
+        return Constants.SQRT_PRICE_1_1;
+    }
+
     function setUpVaults(bool _isAaveWrapperTest) public virtual {
         isAaveWrapperTest = _isAaveWrapperTest;
 
@@ -140,15 +144,11 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
         if (isAaveWrapperTest) {
             (vaultWrapperA, vaultWrapperB) = vaultWrappersFactory.createAavePool(
-                (address(underlyingVaultA)), (address(underlyingVaultB)), 3000, 60, Constants.SQRT_PRICE_1_1
+                (address(underlyingVaultA)), (address(underlyingVaultB)), 3000, 60, _getInitialPrice()
             );
         } else {
             (vaultWrapperA, vaultWrapperB) = vaultWrappersFactory.createERC4626VaultPool(
-                IERC4626(address(underlyingVaultA)),
-                IERC4626(address(underlyingVaultB)),
-                3000,
-                60,
-                Constants.SQRT_PRICE_1_1
+                IERC4626(address(underlyingVaultA)), IERC4626(address(underlyingVaultB)), 3000, 60, _getInitialPrice()
             );
         }
         // Compare vaultWrapper addresses and assign 0/1 based on which is lower
@@ -190,11 +190,11 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
         if (isAaveWrapperTest) {
             mixedVaultWrapper = vaultWrappersFactory.createAaveToTokenPool(
-                address(mixedVault), address(rawAsset), 3000, 60, Constants.SQRT_PRICE_1_1
+                address(mixedVault), address(rawAsset), 3000, 60, _getInitialPrice()
             );
         } else {
             mixedVaultWrapper = vaultWrappersFactory.createERC4626VaultToTokenPool(
-                IERC4626(address(mixedVault)), address(rawAsset), 3000, 60, Constants.SQRT_PRICE_1_1
+                IERC4626(address(mixedVault)), address(rawAsset), 3000, 60, _getInitialPrice()
             );
         }
 
@@ -276,7 +276,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         params.tickLower = TickMath.minUsableTick(poolKey.tickSpacing);
         params.tickUpper = TickMath.maxUsableTick(poolKey.tickSpacing);
 
-        params.liquidityDelta = bound(params.liquidityDelta, 1, 1_000_000); //to avoid hitting deposit caps in fork tests
+        params.liquidityDelta = bound(params.liquidityDelta, 1, 10 ** 10); //to avoid hitting deposit caps in fork tests
 
         (uint160 sqrtRatioX96,,,) = poolManager.getSlot0(poolKey.toId());
 
@@ -412,7 +412,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         params.tickLower = TickMath.minUsableTick(mixedPoolKey.tickSpacing);
         params.tickUpper = TickMath.maxUsableTick(mixedPoolKey.tickSpacing);
 
-        params.liquidityDelta = bound(params.liquidityDelta, 1, 1_000_000); // small number to avoid hitting deposit caps in fork tests
+        params.liquidityDelta = bound(params.liquidityDelta, 1, 10 ** 10); // small number to avoid hitting deposit caps in fork tests
 
         (uint160 sqrtRatioX96,,,) = poolManager.getSlot0(mixedPoolKey.toId());
 
