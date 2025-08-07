@@ -9,10 +9,12 @@ import {MockERC20} from "test/utils/MockERC20.sol";
 import {MockERC4626} from "test/utils/MockERC4626.sol";
 import {FullMath} from "lib/v4-periphery/lib/v4-core/src/libraries/FullMath.sol";
 import {LibClone} from "lib/solady/src/utils/LibClone.sol";
+import {console} from "forge-std/console.sol";
 
 contract ERC4626VaultWrapperTest is ERC4626Test {
     address harvester = makeAddr("harvester");
     address harvestReceiver = makeAddr("harvestReceiver");
+    address insuranceFund = makeAddr("insuranceFund");
     address vaultImplementation = address(new ERC4626VaultWrapper());
     MockERC4626 underlyingVault;
     MockERC20 underlyingAsset;
@@ -99,7 +101,48 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
             } catch {
                 vm.assume(false);
             }
-        } //we only support vaults that are ever increasing in value. i.e. lending protocols
+        } else {
+            int256 lossLimit = bound(init.yield, 0, type(int256).max);
+
+            uint256 loss = bound(uint256(lossLimit), 0, underlyingVault.totalAssets() - 1);
+
+            //in case there is a loss, that means the underlying lending protocol incurred bad debt and there was bad debt was socialized. we expect an insurance fund to come in and burn the vault wrapper shares to make the wrapper whole
+            //this is a rare event in a lending protocol and that is why the insurance fund is not baked in the protocol. It is supposed to be a separate entity that comes in and burns the shares to make the vault wrapper whole
+            //It could be VII Finance or the underlying lending protocol itself
+
+            try underlyingAsset.burn(address(underlyingVault), loss) {
+                //in this case, the harvest call should still work but the pendingYield should be zero
+                vm.prank(harvester);
+                (uint256 harvestedAssets, uint256 fees) = ERC4626VaultWrapper(_vault_).harvest(harvestReceiver);
+
+                assertEq(harvestedAssets, 0, "Harvested assets should be zero in case of a loss");
+                assertEq(fees, 0, "Fees should be zero in case of a loss");
+
+                //what we expect to happen in this case is that the vault wrapper shares equal to the loss amount should be burned
+
+                uint256 underlyingAssetsToMint = loss + 1;
+                underlyingAsset.mint(insuranceFund, underlyingAssetsToMint);
+
+                vm.startPrank(insuranceFund);
+                underlyingAsset.approve(address(underlyingVault), underlyingAssetsToMint);
+                uint256 underlyingVaultSharesMinted = underlyingVault.deposit(underlyingAssetsToMint, insuranceFund);
+                underlyingVault.approve(_vault_, underlyingVaultSharesMinted);
+                ERC4626VaultWrapper(_vault_).deposit(underlyingVaultSharesMinted, insuranceFund);
+
+                //this must have mint greater or equal shares than the loss amount
+                ERC4626VaultWrapper(_vault_).burn(loss);
+
+                assertLe(
+                    ERC4626VaultWrapper(_vault_).totalSupply(),
+                    underlyingVault.convertToAssets(underlyingVault.balanceOf(_vault_)),
+                    "Insurance fund should burn shares equal to the loss amount"
+                );
+
+                vm.stopPrank();
+            } catch {
+                vm.assume(false);
+            }
+        }
     }
 
     modifier checkInvariants() {
