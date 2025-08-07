@@ -15,6 +15,7 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
     address harvester = makeAddr("harvester");
     address harvestReceiver = makeAddr("harvestReceiver");
     address insuranceFund = makeAddr("insuranceFund");
+    address feeReceiver = makeAddr("feeReceiver");
     address vaultImplementation = address(new ERC4626VaultWrapper());
     MockERC4626 underlyingVault;
     MockERC20 underlyingAsset;
@@ -73,6 +74,10 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
             vm.stopPrank();
         }
 
+        //decide the fee by pulling randomness from the first user shares
+        uint256 feeDivisor = bound(init.share[0], 14, 100);
+        ERC4626VaultWrapper(_vault_).setFeeParameters(feeDivisor, feeReceiver);
+
         // setup initial yield for vault
         setUpYield(init);
     }
@@ -86,16 +91,34 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
             try underlyingAsset.mint(address(underlyingVault), gain) {
                 //prank the harvestor and harvest
                 uint256 harvestReceiverBalanceBefore = ERC20(_vault_).balanceOf(harvestReceiver);
+                uint256 feeReceiverBalanceBefore = ERC20(_vault_).balanceOf(feeReceiver);
+
+                uint256 totalPendingYield = ERC4626VaultWrapper(_vault_).totalPendingYield();
+
                 vm.prank(harvester);
-                ERC4626VaultWrapper(_vault_).harvest(harvestReceiver);
+                (uint256 actualHarvestedAssets, uint256 actualFees) =
+                    ERC4626VaultWrapper(_vault_).harvest(harvestReceiver);
+
+                assertEq(totalPendingYield, actualHarvestedAssets + actualFees);
 
                 uint256 profitForHarvester = FullMath.mulDiv(
                     ERC4626VaultWrapper(_vault_).totalAssets(), gain, ERC4626(address(underlyingVault)).totalSupply()
                 );
 
+                uint256 feeForFeeReceiver = profitForHarvester / ERC4626VaultWrapper(_vault_).feeDivisor();
+
+                assertEq(actualHarvestedAssets, profitForHarvester - feeForFeeReceiver);
+                assertEq(actualFees, feeForFeeReceiver);
+
+                assertEq(
+                    ERC20(_vault_).balanceOf(feeReceiver),
+                    feeReceiverBalanceBefore + feeForFeeReceiver,
+                    "Fee receiver balance should increase by the fee amount"
+                );
+
                 assertEq(
                     ERC20(_vault_).balanceOf(harvestReceiver),
-                    harvestReceiverBalanceBefore + profitForHarvester,
+                    harvestReceiverBalanceBefore + profitForHarvester - feeForFeeReceiver,
                     "Harvest receiver balance should increase by the yield amount"
                 );
             } catch {

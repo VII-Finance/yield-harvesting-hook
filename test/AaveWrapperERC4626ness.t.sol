@@ -6,6 +6,7 @@ import {AaveWrapper} from "src/VaultWrappers/AaveWrapper.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {LibClone} from "lib/solady/src/utils/LibClone.sol";
 import {MockAaveWrapper} from "test/utils/MockAaveWrapper.sol";
+import {ERC4626VaultWrapper} from "src/VaultWrappers/ERC4626VaultWrapper.sol";
 
 //It tests ERC4626ness of AaveWrapper
 //It's simple, just returns 1:1 every time
@@ -36,14 +37,29 @@ contract AaveWrapperERC4626nessTest is ERC4626VaultWrapperTest {
 
                 //prank the harvestor and harvest
                 uint256 harvestReceiverBalanceBefore = ERC20(_vault_).balanceOf(harvestReceiver);
+                uint256 feeReceiverBalanceBefore = ERC20(_vault_).balanceOf(feeReceiver);
+
+                assertEq(ERC4626VaultWrapper(_vault_).totalPendingYield(), gain);
+
                 vm.prank(harvester);
-                MockAaveWrapper(_vault_).harvest(harvestReceiver);
+                (uint256 actualHarvestedAssets, uint256 actualFees) = MockAaveWrapper(_vault_).harvest(harvestReceiver);
 
                 uint256 profitForHarvester = gain;
 
+                uint256 feeForFeeReceiver = profitForHarvester / ERC4626VaultWrapper(_vault_).feeDivisor();
+
+                assertEq(actualHarvestedAssets, profitForHarvester - feeForFeeReceiver);
+                assertEq(actualFees, feeForFeeReceiver);
+
+                assertEq(
+                    ERC20(_vault_).balanceOf(feeReceiver),
+                    feeReceiverBalanceBefore + feeForFeeReceiver,
+                    "Fee receiver balance should increase by the fee amount"
+                );
+
                 assertEq(
                     ERC20(_vault_).balanceOf(harvestReceiver),
-                    harvestReceiverBalanceBefore + profitForHarvester,
+                    harvestReceiverBalanceBefore + profitForHarvester - feeForFeeReceiver,
                     "Harvest receiver balance should increase by the yield amount"
                 );
             } catch {
