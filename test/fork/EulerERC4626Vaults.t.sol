@@ -23,4 +23,8 @@ contract EulerVaultsTest is BaseVaultsTest {
             MockERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2) //WETH
         );
     }
+
+    function _getInitialPrice() internal view override returns (uint160) {
+        return _getCurrentPrice(0x21c67e77068de97969ba93d4aab21826d33ca12bb9f565d8496e8fda8a82ca27); // v4 ETH/USDC 0.05% pool
+    }
 }
