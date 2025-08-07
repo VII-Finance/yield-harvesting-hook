@@ -45,8 +45,17 @@ contract AaveVaultsTest is BaseVaultsTest {
         deal(underlyingAsset, address(this), amount);
         MockERC20(underlyingAsset).approve(address(pool), amount);
 
+        uint256 aTokenBalanceBefore = aToken.balanceOf(to);
+
         pool.supply(underlyingAsset, amount, to, 0);
 
-        return amount;
+        assertApproxEqAbs(
+            aToken.balanceOf(to) - aTokenBalanceBefore,
+            amount,
+            2,
+            "AToken balance after supply should be equal to the amount supplied"
+        );
+
+        return aToken.balanceOf(to) - aTokenBalanceBefore;
     }
 }
