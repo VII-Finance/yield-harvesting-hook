@@ -126,6 +126,8 @@ contract ERC4626VaultWrapperFactoryTest is Test {
 
         assertEq(wrapperA.asset(), address(vaultA));
         assertEq(wrapperB.asset(), address(vaultB));
+        assertEq(wrapperA.decimals(), vaultA.decimals());
+        assertEq(wrapperB.decimals(), vaultB.decimals());
 
         PoolKey memory key = _buildPoolKey(address(wrapperA), address(wrapperB));
         assertTrue(isPoolInitialized(key), "Pool should be initialized");
@@ -140,6 +142,7 @@ contract ERC4626VaultWrapperFactoryTest is Test {
         assertEq(wrapper.asset(), address(vaultA));
         assertEq(wrapper.name(), "VII Finance Wrapped Mock ERC4626");
         assertEq(wrapper.symbol(), "VII-mERC4626");
+        assertEq(wrapper.decimals(), vaultA.decimals());
 
         PoolKey memory key = _buildPoolKey(address(wrapper), address(tokenA));
         assertTrue(isPoolInitialized(key), "Pool should be initialized");
@@ -301,6 +304,10 @@ contract ERC4626VaultWrapperFactoryTest is Test {
         vm.expectRevert(BaseVaultWrapper.InvalidFeeParams.selector);
         vm.startPrank(factoryOwner);
         factory.setWrapperFeeParameters(address(aaveWrapper), 13, makeAddr("feeReceiver"));
+
+        //setting feeReceiver to zero address should fail
+        vm.expectRevert(BaseVaultWrapper.InvalidFeeParams.selector);
+        factory.setWrapperFeeParameters(address(aaveWrapper), 20, address(0));
 
         factory.setWrapperFeeParameters(address(aaveWrapper), 14, makeAddr("feeReceiver"));
         assertEq(aaveWrapper.feeDivisor(), 14);
