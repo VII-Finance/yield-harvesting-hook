@@ -17,55 +17,40 @@ import {BaseVaultWrapper} from "src/VaultWrappers/Base/BaseVaultWrapper.sol";
 contract ERC4626VaultWrapper is BaseVaultWrapper {
     constructor() BaseVaultWrapper() {}
 
-    function totalAssets() public view override returns (uint256) {
-        return IERC20(getUnderlyingVault()).balanceOf(address(this));
-    }
-
-    function underlyingVault() public view returns (IERC4626) {
-        return IERC4626(getUnderlyingVault());
-    }
-
     function previewMint(uint256 shares) public view override returns (uint256) {
-        return underlyingVault().previewWithdraw(shares);
+        return _underlyingVault().previewWithdraw(shares);
     }
 
     function previewWithdraw(uint256 assets) public view override returns (uint256) {
-        return underlyingVault().previewMint(assets);
+        return _underlyingVault().previewMint(assets);
     }
 
     function previewDeposit(uint256 assets) public view override returns (uint256) {
-        return underlyingVault().previewRedeem(assets);
+        return _underlyingVault().previewRedeem(assets);
     }
 
     function previewRedeem(uint256 shares) public view override returns (uint256) {
-        return underlyingVault().previewDeposit(shares);
+        return _underlyingVault().previewDeposit(shares);
     }
 
     function convertToShares(uint256 assets) public view override returns (uint256) {
-        return underlyingVault().convertToAssets(assets);
+        return _underlyingVault().convertToAssets(assets);
     }
 
     function convertToAssets(uint256 shares) public view override returns (uint256) {
-        return underlyingVault().convertToShares(shares);
-    }
-
-    function maxDeposit(address) public view override returns (uint256) {
-        return underlyingVault().maxMint(address(this));
-    }
-
-    function maxMint(address) public view override returns (uint256) {
-        return underlyingVault().maxDeposit(address(this));
+        return _underlyingVault().convertToShares(shares);
     }
 
     function maxWithdraw(address owner) public view override returns (uint256) {
         return convertToAssets(maxRedeem(owner));
     }
 
-    function maxRedeem(address owner) public view override returns (uint256) {
-        return Math.min(underlyingVault().maxWithdraw(address(this)), balanceOf(owner));
+    function _underlyingVault() internal view returns (IERC4626) {
+        return IERC4626(asset());
     }
 
     function _getMaxWithdrawableUnderlyingAssets() internal view override returns (uint256) {
-        return underlyingVault().previewRedeem(totalAssets());
+        IERC4626 underlyingVault = _underlyingVault();
+        return underlyingVault.previewRedeem(underlyingVault.balanceOf(address(this)));
     }
 }

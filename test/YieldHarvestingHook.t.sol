@@ -28,21 +28,7 @@ import {MockERC20} from "test/utils/MockERC20.sol";
 import {FeeMath, PositionConfig} from "test/utils/libraries/FeeMath.sol";
 import {IERC4626} from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import {Constants} from "@uniswap/v4-core/test/utils/Constants.sol";
-import {MockAaveWrapper} from "test/utils/MockAaveWrapper.sol";
-
-contract MockERC4626VaultWrapperFactory is ERC4626VaultWrapperFactory {
-    constructor(address _owner, PoolManager _manager, address _yieldHarvestingHook)
-        ERC4626VaultWrapperFactory(_owner, _manager, _yieldHarvestingHook)
-    {
-        aaveWrapperImplementation = address(new MockAaveWrapper());
-    }
-}
-
-contract MockYieldHarvestingHook is YieldHarvestingHook {
-    constructor(address _owner, PoolManager _manager) YieldHarvestingHook(_owner, _manager) {
-        erc4626VaultWrapperFactory = address(new MockERC4626VaultWrapperFactory(_owner, _manager, address(this)));
-    }
-}
+import "forge-std/console.sol";
 
 contract YieldHarvestingHookTest is Fuzzers, Test {
     using StateLibrary for PoolManager;
@@ -92,11 +78,11 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         (, bytes32 salt) = HookMiner.find(
             address(this),
             HOOK_PERMISSIONS,
-            type(MockYieldHarvestingHook).creationCode,
+            type(YieldHarvestingHook).creationCode,
             abi.encode(factoryOwner, poolManager)
         );
 
-        yieldHarvestingHook = new MockYieldHarvestingHook{salt: salt}(factoryOwner, poolManager);
+        yieldHarvestingHook = new YieldHarvestingHook{salt: salt}(factoryOwner, poolManager);
 
         vaultWrappersFactory = ERC4626VaultWrapperFactory(yieldHarvestingHook.erc4626VaultWrapperFactory());
     }
@@ -276,7 +262,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         params.tickLower = TickMath.minUsableTick(poolKey.tickSpacing);
         params.tickUpper = TickMath.maxUsableTick(poolKey.tickSpacing);
 
-        params.liquidityDelta = bound(params.liquidityDelta, 1, 10 ** 10); //to avoid hitting deposit caps in fork tests
+        params.liquidityDelta = bound(params.liquidityDelta, 1, 10 ** 9); //to avoid hitting deposit caps in fork tests
 
         (uint160 sqrtRatioX96,,,) = poolManager.getSlot0(poolKey.toId());
 
@@ -412,7 +398,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         params.tickLower = TickMath.minUsableTick(mixedPoolKey.tickSpacing);
         params.tickUpper = TickMath.maxUsableTick(mixedPoolKey.tickSpacing);
 
-        params.liquidityDelta = bound(params.liquidityDelta, 1, 10 ** 10); // small number to avoid hitting deposit caps in fork tests
+        params.liquidityDelta = bound(params.liquidityDelta, 1, 10 ** 9); // small number to avoid hitting deposit caps in fork tests
 
         (uint160 sqrtRatioX96,,,) = poolManager.getSlot0(mixedPoolKey.toId());
 
@@ -486,16 +472,43 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
         if (isVaultWrapper0) {
             assertApproxEqAbs(feesOwed.amount0(), int256(vaultYield), 1, "feesOwed amount0 should match vault yield");
-            // Raw asset should have minimal fees (only from swap, not yield)
-            int128 rawFees = feesOwed.amount1();
-            uint256 absRawFees = rawFees >= 0 ? uint256(int256(rawFees)) : uint256(int256(-rawFees));
-            assertLt(absRawFees, 10, "feesOwed amount1 should be minimal for raw asset");
         } else {
-            // Raw asset should have minimal fees (only from swap, not yield)
-            int128 rawFees = feesOwed.amount0();
-            uint256 absRawFees = rawFees >= 0 ? uint256(int256(rawFees)) : uint256(int256(-rawFees));
-            assertLt(absRawFees, 10, "feesOwed amount0 should be minimal for raw asset");
             assertApproxEqAbs(feesOwed.amount1(), int256(vaultYield), 1, "feesOwed amount1 should match vault yield");
+        }
+
+        uint256 balance0Before = mixedPoolKey.currency0.balanceOfSelf();
+        uint256 balance1Before = mixedPoolKey.currency1.balanceOfSelf();
+
+        params.liquidityDelta = 0;
+        modifyMixedLiquidity(params, sqrtRatioX96);
+
+        if (isVaultWrapper0) {
+            assertApproxEqAbs(
+                mixedPoolKey.currency0.balanceOfSelf() - balance0Before,
+                vaultYield,
+                1,
+                "Balance for mixedVault should increase by vault yield"
+            );
+            //no change in the other token
+            assertApproxEqAbs(
+                mixedPoolKey.currency1.balanceOfSelf() - balance1Before,
+                0,
+                1,
+                "Balance for other rawAsset should not change"
+            );
+        } else {
+            assertApproxEqAbs(
+                mixedPoolKey.currency1.balanceOfSelf() - balance1Before,
+                vaultYield,
+                1,
+                "Balance for currency1 should increase by yield1"
+            );
+            assertApproxEqAbs(
+                mixedPoolKey.currency0.balanceOfSelf() - balance0Before,
+                0,
+                1,
+                "Balance for other rawAsset should not change"
+            );
         }
     }
 

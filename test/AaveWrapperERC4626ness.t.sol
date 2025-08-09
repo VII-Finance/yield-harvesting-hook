@@ -5,13 +5,12 @@ import {ERC4626VaultWrapperTest} from "test/ERC4626VaultWrapper.t.sol";
 import {AaveWrapper} from "src/VaultWrappers/AaveWrapper.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {LibClone} from "lib/solady/src/utils/LibClone.sol";
-import {MockAaveWrapper} from "test/utils/MockAaveWrapper.sol";
 import {ERC4626VaultWrapper} from "src/VaultWrappers/ERC4626VaultWrapper.sol";
 
 //It tests ERC4626ness of AaveWrapper
 //It's simple, just returns 1:1 every time
 contract AaveWrapperERC4626nessTest is ERC4626VaultWrapperTest {
-    address aaveWrapperImplementation = address(new MockAaveWrapper());
+    address aaveWrapperImplementation = address(new AaveWrapper());
 
     function setUp() public virtual override {
         super.setUp();
@@ -42,7 +41,7 @@ contract AaveWrapperERC4626nessTest is ERC4626VaultWrapperTest {
                 assertEq(ERC4626VaultWrapper(_vault_).totalPendingYield(), gain);
 
                 vm.prank(harvester);
-                (uint256 actualHarvestedAssets, uint256 actualFees) = MockAaveWrapper(_vault_).harvest(harvestReceiver);
+                (uint256 actualHarvestedAssets, uint256 actualFees) = AaveWrapper(_vault_).harvest(harvestReceiver);
 
                 uint256 profitForHarvester = gain;
 

@@ -15,7 +15,7 @@ contract BaseVaultsTest is YieldHarvestingHookTest {
 
     function setUp() public virtual override {
         string memory fork_url = vm.envString("MAINNET_RPC_URL");
-        vm.createSelectFork(fork_url); //every time, this will fork at the latest block to test against the latest state
+        vm.createSelectFork(fork_url, 23101344);
 
         super.setUp();
     }
