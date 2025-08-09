@@ -10,6 +10,7 @@ import {IAToken} from "@aave-v3-core/interfaces/IAToken.sol";
 
 import {IPoolDataProvider} from "@aave-v3-core/interfaces/IPoolDataProvider.sol";
 import {IPoolAddressesProvider} from "@aave-v3-core/interfaces/IPoolAddressesProvider.sol";
+import {WadRayMath} from "@aave-v3-core/protocol/libraries/math/WadRayMath.sol";
 import {LibClone} from "lib/solady/src/utils/LibClone.sol";
 
 contract AaveWrapperTest is Test {
@@ -19,6 +20,7 @@ contract AaveWrapperTest is Test {
     IPool aavePool;
 
     IPoolAddressesProvider addressProvider = IPoolAddressesProvider(0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e); // Aave V3 Provider
+    IPoolDataProvider dataProvider;
 
     function setUp() public {
         string memory fork_url = vm.envString("MAINNET_RPC_URL");
@@ -26,6 +28,7 @@ contract AaveWrapperTest is Test {
 
         aavePool = IPool(addressProvider.getPool());
         aaveWrapperImplementation = address(new AaveWrapper());
+        dataProvider = IPoolDataProvider(addressProvider.getPoolDataProvider());
     }
 
     function _deployAaveWrapper(IAToken aToken) internal returns (AaveWrapper) {
@@ -38,14 +41,44 @@ contract AaveWrapperTest is Test {
         );
     }
 
+    function _getSupplyCapAndCurrentSupply(IAToken aToken)
+        internal
+        view
+        returns (uint256 supplyCapWithDecimals, uint256 currentSupply)
+    {
+        (, uint256 supplyCap) = dataProvider.getReserveCaps(aToken.UNDERLYING_ASSET_ADDRESS());
+        supplyCapWithDecimals = supplyCap * (10 ** ERC20(address(aToken)).decimals());
+
+        (, uint256 accruedToTreasuryScaled,,,,,,,, uint256 liquidityIndex,,) =
+            dataProvider.getReserveData(aToken.UNDERLYING_ASSET_ADDRESS());
+
+        currentSupply = WadRayMath.rayMul((aToken.scaledTotalSupply() + accruedToTreasuryScaled), liquidityIndex);
+    }
+
     function testMaxDepositWhenActive() public {
         IAToken aToken = IAToken(0x0B925eD163218f6662a35e0f0371Ac234f9E9371); // wstETH aToken
 
         aaveWrapper = _deployAaveWrapper(aToken);
 
+        (uint256 supplyCapWithDecimals, uint256 currentSupply) = _getSupplyCapAndCurrentSupply(aToken);
+
         assertEq(
             aaveWrapper.maxDeposit(address(this)),
-            424669147063254908399343,
+            supplyCapWithDecimals - currentSupply,
+            "Max deposit should equal supply cap - total supplied when active"
+        );
+    }
+
+    function testMaxDepositWhenActiveNon18Decimals() public {
+        IAToken aToken = IAToken(0x23878914EFE38d27C4D67Ab83ed1b93A74D4086a); // USDT aToken
+
+        aaveWrapper = _deployAaveWrapper(aToken);
+
+        (uint256 supplyCapWithDecimals, uint256 currentSupply) = _getSupplyCapAndCurrentSupply(aToken);
+
+        assertEq(
+            aaveWrapper.maxDeposit(address(this)),
+            supplyCapWithDecimals - currentSupply,
             "Max deposit should equal supply cap - total supplied when active"
         );
     }
