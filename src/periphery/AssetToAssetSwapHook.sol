@@ -92,8 +92,10 @@ contract AssetToAssetSwapHook is BaseHook {
         (context.underlyingVaultIn, context.underlyingVaultOut) =
             params.zeroForOne ? (underlyingVault0, underlyingVault1) : (underlyingVault1, underlyingVault0);
 
-        context.assetIn = IERC20(Currency.unwrap(key.currency0));
-        context.assetOut = IERC20(Currency.unwrap(key.currency1));
+        context.assetIn =
+            params.zeroForOne ? IERC20(Currency.unwrap(key.currency0)) : IERC20(Currency.unwrap(key.currency1));
+        context.assetOut =
+            params.zeroForOne ? IERC20(Currency.unwrap(key.currency1)) : IERC20(Currency.unwrap(key.currency0));
 
         context.vaultWrapperPoolKey = PoolKey({
             currency0: Currency.wrap(address(vaultWrapper0)),
@@ -154,6 +156,19 @@ contract AssetToAssetSwapHook is BaseHook {
             false // isExactInput = false
         );
 
+        // Take the vault wrapper shares obtained from swap
+        poolManager.take(Currency.wrap(address(context.vaultWrapperOut)), address(this), vaultWrapperSharesNeeded);
+
+        // Convert to output asset
+        _withdrawVaultWrapperToAsset(
+            context.vaultWrapperOut,
+            context.underlyingVaultOut,
+            context.assetOut,
+            vaultWrapperSharesNeeded,
+            underlyingVaultSharesNeeded,
+            amountOut
+        );
+
         // Calculate input amount needed
         uint256 underlyingVaultSharesNeedIn = context.vaultWrapperIn.previewMint(vaultWrapperInAmount);
         amountIn = context.underlyingVaultIn.previewMint(underlyingVaultSharesNeedIn);
@@ -168,19 +183,6 @@ contract AssetToAssetSwapHook is BaseHook {
             amountIn,
             underlyingVaultSharesNeedIn,
             vaultWrapperInAmount
-        );
-
-        // Take the vault wrapper shares obtained from swap
-        poolManager.take(Currency.wrap(address(context.vaultWrapperOut)), address(this), vaultWrapperSharesNeeded);
-
-        // Convert to output asset
-        _withdrawVaultWrapperToAsset(
-            context.vaultWrapperOut,
-            context.underlyingVaultOut,
-            context.assetOut,
-            vaultWrapperSharesNeeded,
-            underlyingVaultSharesNeeded,
-            amountOut
         );
     }
 

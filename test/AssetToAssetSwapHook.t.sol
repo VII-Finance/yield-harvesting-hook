@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {YieldHarvestingHookTest} from "test/YieldHarvestingHook.t.sol";
-import {AssetToAssetSwapHook} from "src/Helpers/AssetToAssetSwapHook.sol";
+import {AssetToAssetSwapHook} from "src/periphery/AssetToAssetSwapHook.sol";
 import {HookMiner} from "lib/v4-periphery/src/utils/HookMiner.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
@@ -37,25 +37,39 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
         ModifyLiquidityParams memory liquidityParams = ModifyLiquidityParams({
             tickLower: TickMath.minUsableTick(poolKey.tickSpacing),
             tickUpper: TickMath.maxUsableTick(poolKey.tickSpacing),
-            liquidityDelta: 1e18,
+            liquidityDelta: 1e20,
             salt: keccak256(abi.encodePacked(address(this), SWAP_HOOK_PERMISSIONS))
         });
 
         modifyLiquidity(liquidityParams, sqrtRatioX96);
 
+        Currency currency0 =
+            address(asset0) < address(asset1) ? Currency.wrap(address(asset0)) : Currency.wrap(address(asset1));
+
+        bool isCurrency0SameAsAsset0 = currency0 == Currency.wrap(address(asset0));
+
         (, bytes32 salt) = HookMiner.find(
             address(this),
             SWAP_HOOK_PERMISSIONS,
             type(AssetToAssetSwapHook).creationCode,
-            abi.encode(poolManager, vaultWrapper0, vaultWrapper1, yieldHarvestingHook)
+            abi.encode(
+                poolManager,
+                isCurrency0SameAsAsset0 ? vaultWrapper0 : vaultWrapper1,
+                isCurrency0SameAsAsset0 ? vaultWrapper1 : vaultWrapper0,
+                yieldHarvestingHook
+            )
         );
 
-        assetToAssetSwapHook =
-            new AssetToAssetSwapHook{salt: salt}(poolManager, vaultWrapper0, vaultWrapper1, yieldHarvestingHook);
+        assetToAssetSwapHook = new AssetToAssetSwapHook{salt: salt}(
+            poolManager,
+            isCurrency0SameAsAsset0 ? vaultWrapper0 : vaultWrapper1,
+            isCurrency0SameAsAsset0 ? vaultWrapper1 : vaultWrapper0,
+            yieldHarvestingHook
+        );
 
         assetsPoolKey = PoolKey({
-            currency0: Currency.wrap(address(asset0)),
-            currency1: Currency.wrap(address(asset1)),
+            currency0: isCurrency0SameAsAsset0 ? Currency.wrap(address(asset0)) : Currency.wrap(address(asset1)),
+            currency1: isCurrency0SameAsAsset0 ? Currency.wrap(address(asset1)) : Currency.wrap(address(asset0)),
             fee: poolKey.fee,
             tickSpacing: poolKey.tickSpacing,
             hooks: assetToAssetSwapHook
@@ -92,24 +106,25 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
     function test_assetsSwapExactAmountOut() public {
         uint256 amountOut = 1e18;
 
-        asset0.mint(address(this), 18453516209681194614061326345088274511);
-        asset0.approve(address(swapRouter), 18453516209681194614061326345088274511);
+        asset1.mint(address(this), 2 * amountOut);
+        asset1.approve(address(swapRouter), 2 * amountOut);
 
-        //we assume that prior to the mint, poolManager already has some asset0 that user can take it out of
-        asset0.mint(address(poolManager), 18453516209681194614061326345088274511);
+        //we assume that prior to the swap, poolManager already has some asset1 that user can take it out of
+        asset1.mint(address(poolManager), 2 * amountOut);
 
         uint256 asset1BalanceBefore = asset1.balanceOf(address(this));
 
         SwapParams memory swapParams = SwapParams({
-            zeroForOne: true,
+            zeroForOne: false,
             amountSpecified: int256(amountOut),
-            sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
+            sqrtPriceLimitX96: TickMath.MAX_SQRT_PRICE - 1
         });
 
         BalanceDelta swapDelta = swapRouter.swap(
             assetsPoolKey, swapParams, PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}), ""
         );
 
-        assertEq(amountOut, asset1.balanceOf(address(this)) - asset1BalanceBefore, "Incorrect asset1 out amount");
+        uint256 asset1In = SafeCast.toUint256(-swapDelta.amount1());
+        assertEq(asset1In, asset1BalanceBefore - asset1.balanceOf(address(this)), "Incorrect asset1 out amount");
     }
 }
