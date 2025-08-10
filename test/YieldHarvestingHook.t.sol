@@ -195,6 +195,22 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
             tickSpacing: 60,
             hooks: yieldHarvestingHook
         });
+
+        labelAllAddresses();
+    }
+
+    function labelAllAddresses() internal {
+        vm.label(address(vaultWrapper0), "vaultWrapper0");
+        vm.label(address(vaultWrapper1), "vaultWrapper1");
+        vm.label(address(mixedVault), "mixedVault");
+        vm.label(address(rawAsset), "rawAsset");
+        vm.label(address(mixedVaultWrapper), "mixedVaultWrapper");
+
+        vm.label(address(underlyingVault0), "underlyingVault0");
+        vm.label(address(underlyingVault1), "underlyingVault1");
+
+        vm.label(address(asset0), "asset0");
+        vm.label(address(asset1), "asset1");
     }
 
     function modifyLiquidity(ModifyLiquidityParams memory params, uint160 sqrtPriceX96) internal {
