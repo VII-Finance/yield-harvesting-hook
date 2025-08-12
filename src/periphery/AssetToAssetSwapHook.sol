@@ -159,7 +159,7 @@ contract AssetToAssetSwapHook is BaseHook {
         // Take the vault wrapper shares obtained from swap
         poolManager.take(Currency.wrap(address(context.vaultWrapperOut)), address(this), vaultWrapperSharesNeeded);
 
-        // Convert to output asset
+        // output assets are withdrawn from vaultWrapperOut and sent to the poolManager so that the original swapper can take it out
         _withdrawVaultWrapperToAsset(
             context.vaultWrapperOut,
             context.underlyingVaultOut,
@@ -176,6 +176,7 @@ contract AssetToAssetSwapHook is BaseHook {
         // Take input from pool manager and mint vault wrapper shares
         poolManager.take(Currency.wrap(address(context.assetIn)), address(this), amountIn);
 
+        //vault wrapperIn tokens are minted and settled
         _mintVaultWrapperShares(
             context.assetIn,
             context.underlyingVaultIn,
