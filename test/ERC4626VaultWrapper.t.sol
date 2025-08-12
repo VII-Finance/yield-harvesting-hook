@@ -10,7 +10,6 @@ import {MockERC20} from "test/utils/MockERC20.sol";
 import {MockERC4626} from "test/utils/MockERC4626.sol";
 import {FullMath} from "lib/v4-periphery/lib/v4-core/src/libraries/FullMath.sol";
 import {LibClone} from "lib/solady/src/utils/LibClone.sol";
-import {console} from "forge-std/console.sol";
 
 contract ERC4626VaultWrapperTest is ERC4626Test {
     address harvester = makeAddr("harvester");
