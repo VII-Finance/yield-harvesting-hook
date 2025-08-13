@@ -16,9 +16,11 @@ import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 import {PoolManager} from "@uniswap/v4-core/src/PoolManager.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
+import {IERC4626} from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 
 contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
     AssetToAssetSwapHook assetToAssetSwapHook;
+    AssetToAssetSwapHook mixedAssetToAssetSwapHook;
 
     using StateLibrary for PoolManager;
 
@@ -26,6 +28,7 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
         uint160(Hooks.BEFORE_SWAP_FLAG) | uint160(Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG);
 
     PoolKey assetsPoolKey;
+    PoolKey mixedAssetPoolKey;
 
     function setUp() public override {
         super.setUp();
@@ -42,6 +45,8 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
         });
 
         modifyLiquidity(liquidityParams, sqrtRatioX96);
+
+        modifyMixedLiquidity(liquidityParams, sqrtRatioX96);
 
         Currency currency0 =
             address(asset0) < address(asset1) ? Currency.wrap(address(asset0)) : Currency.wrap(address(asset1));
@@ -60,10 +65,29 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
             )
         );
 
+        (, bytes32 mixedSalt) = HookMiner.find(
+            address(this),
+            SWAP_HOOK_PERMISSIONS,
+            type(AssetToAssetSwapHook).creationCode,
+            abi.encode(
+                poolManager,
+                address(rawAsset) < address(mixedVaultWrapper) ? IERC4626(address(rawAsset)) : mixedVaultWrapper,
+                address(rawAsset) < address(mixedVaultWrapper) ? mixedVaultWrapper : IERC4626(address(rawAsset)),
+                yieldHarvestingHook
+            )
+        );
+
         assetToAssetSwapHook = new AssetToAssetSwapHook{salt: salt}(
             poolManager,
             isCurrency0SameAsAsset0 ? vaultWrapper0 : vaultWrapper1,
             isCurrency0SameAsAsset0 ? vaultWrapper1 : vaultWrapper0,
+            yieldHarvestingHook
+        );
+
+        mixedAssetToAssetSwapHook = new AssetToAssetSwapHook{salt: mixedSalt}(
+            poolManager,
+            address(rawAsset) < address(mixedVaultWrapper) ? IERC4626(address(rawAsset)) : mixedVaultWrapper,
+            address(rawAsset) < address(mixedVaultWrapper) ? mixedVaultWrapper : IERC4626(address(rawAsset)),
             yieldHarvestingHook
         );
 
@@ -75,7 +99,21 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
             hooks: assetToAssetSwapHook
         });
 
-        poolManager.initialize(assetsPoolKey, Constants.SQRT_PRICE_121_100);
+        mixedAssetPoolKey = PoolKey({
+            currency0: address(rawAsset) < address(mixedVaultAsset)
+                ? Currency.wrap(address(rawAsset))
+                : Currency.wrap(address(mixedVaultAsset)),
+            currency1: address(rawAsset) < address(mixedVaultAsset)
+                ? Currency.wrap(address(mixedVaultAsset))
+                : Currency.wrap(address(rawAsset)),
+            fee: poolKey.fee,
+            tickSpacing: poolKey.tickSpacing,
+            hooks: mixedAssetToAssetSwapHook
+        });
+
+        poolManager.initialize(assetsPoolKey, Constants.SQRT_PRICE_1_1);
+
+        poolManager.initialize(mixedAssetPoolKey, Constants.SQRT_PRICE_1_1);
     }
 
     function test_assetsSwapExactAmountIn() public {

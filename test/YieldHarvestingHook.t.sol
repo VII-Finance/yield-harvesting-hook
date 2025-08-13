@@ -205,6 +205,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         vm.label(address(mixedVault), "mixedVault");
         vm.label(address(rawAsset), "rawAsset");
         vm.label(address(mixedVaultWrapper), "mixedVaultWrapper");
+        vm.label(address(mixedVaultAsset), "mixedVaultAsset");
 
         vm.label(address(underlyingVault0), "underlyingVault0");
         vm.label(address(underlyingVault1), "underlyingVault1");
