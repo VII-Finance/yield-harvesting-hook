@@ -17,8 +17,9 @@ import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
+import {BaseAssetToVaultWrapperHelper} from "src/periphery/Base/BaseAssetToVaultWrapperHelper.sol";
 
-contract AssetToAssetSwapHook is BaseHook {
+contract AssetToAssetSwapHook is BaseHook, BaseAssetToVaultWrapperHelper {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
     using SafeCast for int256;
@@ -169,12 +170,7 @@ contract AssetToAssetSwapHook is BaseHook {
 
         // output assets are withdrawn from vaultWrapperOut and sent to the poolManager so that the original swapper can take it out
         _withdrawVaultWrapperToAsset(
-            context.vaultWrapperOut,
-            context.underlyingVaultOut,
-            context.assetOut,
-            vaultWrapperSharesNeeded,
-            underlyingVaultSharesNeeded,
-            amountOut
+            context.vaultWrapperOut, context.underlyingVaultOut, context.assetOut, vaultWrapperSharesNeeded, amountOut
         );
 
         // Calculate input amount needed
@@ -186,12 +182,7 @@ contract AssetToAssetSwapHook is BaseHook {
 
         //vault wrapperIn tokens are minted and settled
         _mintVaultWrapperShares(
-            context.assetIn,
-            context.underlyingVaultIn,
-            context.vaultWrapperIn,
-            amountIn,
-            underlyingVaultSharesNeedIn,
-            vaultWrapperInAmount
+            context.assetIn, context.underlyingVaultIn, context.vaultWrapperIn, amountIn, vaultWrapperInAmount
         );
     }
 
@@ -234,11 +225,8 @@ contract AssetToAssetSwapHook is BaseHook {
     ) private returns (uint256 vaultWrapperShares) {
         poolManager.sync(Currency.wrap(address(vaultWrapper)));
         if (address(vaultWrapper) != address(asset)) {
-            // Deposit asset into underlying vault
-            uint256 underlyingVaultShares = _depositToVault(asset, underlyingVault, assetAmount);
-            // Deposit underlying vault shares into vault wrapper
-            vaultWrapperShares = _depositToVault(
-                IERC20(address(underlyingVault)), vaultWrapper, underlyingVaultShares, address(poolManager)
+            vaultWrapperShares = _deposit(
+                vaultWrapper, address(underlyingVault), asset, address(this), assetAmount, address(poolManager)
             );
         } else {
             vaultWrapperShares = assetAmount;
@@ -280,10 +268,8 @@ contract AssetToAssetSwapHook is BaseHook {
     ) private returns (uint256 assetAmount) {
         poolManager.sync(Currency.wrap(address(asset)));
         if (address(vaultWrapper) != address(asset)) {
-            // Redeem vault wrapper shares for underlying vault shares
-            uint256 underlyingVaultShares = vaultWrapper.redeem(vaultWrapperAmount, address(this), address(this));
-            // Redeem underlying vault shares for assets
-            assetAmount = underlyingVault.redeem(underlyingVaultShares, address(poolManager), address(this));
+            assetAmount =
+                _redeem(vaultWrapper, address(underlyingVault), address(this), vaultWrapperAmount, address(poolManager));
         } else {
             // Transfer asset to the poolManager
             SafeERC20.safeTransfer(asset, address(poolManager), vaultWrapperAmount);
@@ -298,22 +284,13 @@ contract AssetToAssetSwapHook is BaseHook {
         IERC4626 underlyingVault,
         IERC4626 vaultWrapper,
         uint256 assetAmount,
-        uint256 underlyingVaultSharesNeeded,
         uint256 vaultWrapperAmount
     ) private {
         poolManager.sync(Currency.wrap(address(vaultWrapper)));
 
         if (address(underlyingVault) != address(vaultWrapper)) {
-            // Mint underlying vault shares
-            _mintVaultShares(asset, underlyingVault, underlyingVaultSharesNeeded, assetAmount);
-
-            // Mint vault wrapper shares
-            _mintVaultShares(
-                IERC20(address(underlyingVault)),
-                vaultWrapper,
-                vaultWrapperAmount,
-                underlyingVaultSharesNeeded,
-                address(poolManager)
+            _mint(
+                vaultWrapper, address(underlyingVault), asset, address(this), vaultWrapperAmount, address(poolManager)
             );
         } else {
             SafeERC20.safeTransfer(asset, address(poolManager), assetAmount);
@@ -327,60 +304,17 @@ contract AssetToAssetSwapHook is BaseHook {
         IERC4626 underlyingVault,
         IERC20 asset,
         uint256 vaultWrapperSharesNeeded,
-        uint256 underlyingVaultSharesNeeded,
         uint256 amountOut
     ) private {
         poolManager.sync(Currency.wrap(address(asset)));
 
         if (address(vaultWrapper) != address(asset)) {
-            // Withdraw from underlying vault
-            uint256 vaultWrapperSharesActuallyBurnt =
-                vaultWrapper.withdraw(underlyingVaultSharesNeeded, address(this), address(this));
-
-            require(vaultWrapperSharesActuallyBurnt == vaultWrapperSharesNeeded, "Insufficient shares burnt");
-
-            // Withdraw from vault wrapper
-            uint256 sharesActuallyBurnt = underlyingVault.withdraw(amountOut, address(poolManager), address(this));
-            require(sharesActuallyBurnt == underlyingVaultSharesNeeded, "Insufficient shares burnt");
+            _withdraw(
+                vaultWrapper, address(underlyingVault), address(this), vaultWrapperSharesNeeded, address(poolManager)
+            );
         } else {
             SafeERC20.safeTransfer(asset, address(poolManager), amountOut);
         }
         poolManager.settle();
-    }
-
-    /// @dev Helper function to deposit to vault with approval handling
-    function _depositToVault(IERC20 asset, IERC4626 vault, uint256 amount) private returns (uint256 shares) {
-        return _depositToVault(asset, vault, amount, address(this));
-    }
-
-    /// @dev Helper function to deposit to vault with approval handling and custom recipient
-    function _depositToVault(IERC20 asset, IERC4626 vault, uint256 amount, address to)
-        private
-        returns (uint256 shares)
-    {
-        try vault.deposit(amount, to) returns (uint256 _shares) {
-            shares = _shares;
-        } catch {
-            SafeERC20.forceApprove(asset, address(vault), type(uint256).max);
-            shares = vault.deposit(amount, to);
-        }
-    }
-
-    /// @dev Helper function to mint vault shares with approval handling
-    function _mintVaultShares(IERC20 asset, IERC4626 vault, uint256 shares, uint256 expectedAssets) private {
-        _mintVaultShares(asset, vault, shares, expectedAssets, address(this));
-    }
-
-    /// @dev Helper function to mint vault shares with approval handling and custom recipient
-    function _mintVaultShares(IERC20 asset, IERC4626 vault, uint256 shares, uint256 expectedAssets, address to)
-        private
-    {
-        try vault.mint(shares, to) returns (uint256 assetsUsed) {
-            require(assetsUsed == expectedAssets, "Insufficient assets minted");
-        } catch {
-            SafeERC20.forceApprove(asset, address(vault), type(uint256).max);
-            uint256 assetsUsed = vault.mint(shares, to);
-            require(assetsUsed == expectedAssets, "Insufficient assets minted");
-        }
     }
 }
