@@ -18,8 +18,10 @@ import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 import {BaseAssetToVaultWrapperHelper} from "src/periphery/Base/BaseAssetToVaultWrapperHelper.sol";
+import {IHookEvents} from "src/interfaces/IHookEvents.sol";
+import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 
-contract AssetToAssetSwapHook is BaseHook, BaseAssetToVaultWrapperHelper {
+contract AssetToAssetSwapHook is BaseHook, BaseAssetToVaultWrapperHelper, IHookEvents {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
     using SafeCast for int256;
@@ -56,7 +58,7 @@ contract AssetToAssetSwapHook is BaseHook, BaseAssetToVaultWrapperHelper {
         hooks = _hooks;
     }
 
-    function _beforeSwap(address, PoolKey calldata key, SwapParams calldata params, bytes calldata)
+    function _beforeSwap(address sender, PoolKey calldata key, SwapParams calldata params, bytes calldata)
         internal
         override
         returns (bytes4, BeforeSwapDelta, uint24)
@@ -75,6 +77,9 @@ contract AssetToAssetSwapHook is BaseHook, BaseAssetToVaultWrapperHelper {
         }
 
         BeforeSwapDelta returnDelta = _calculateReturnDelta(isExactInput, amountIn, amountOut);
+
+        //TODO: emit HookSwap event
+
         return (BaseHook.beforeSwap.selector, returnDelta, 0);
     }
 
