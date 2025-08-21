@@ -12,6 +12,11 @@ import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {AaveWrapper} from "src/VaultWrappers/AaveWrapper.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
+/// @notice The factory does not perform strict sanity checks on the provided addresses to ensure they match the expected types.
+/// For example, if a user inputs an ERC4626 vault address where an aToken is expected, or a token address where an ERC4626 vault is expected, the pool will still be created, but it will be invalid.
+/// Pool deployment is permissionless, so some invalid pools are expected. Basic sanity checks could be added, such as if calling the `asset()` method on an ERC4626 vault address fails it's not an ERC4626 Vault.
+/// However, this does not guarantee the vault strictly adheres to the ERC4626 standard, and we cannot check everything required by the protocol anyway.
+/// Users must ensure that the vault wrappers they deposit into have the correct underlying assets and conform to the expected standards.
 contract ERC4626VaultWrapperFactory is Ownable {
     IPoolManager public immutable poolManager;
     address public immutable yieldHarvestingHook;
