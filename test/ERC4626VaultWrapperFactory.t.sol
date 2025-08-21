@@ -374,6 +374,23 @@ contract ERC4626VaultWrapperFactoryTest is Test {
         assertEq(address(predictedKey.hooks), address(actualKey.hooks));
     }
 
+    function testCreatePoolsWithVaultsShouldFail() public {
+        factory.createERC4626VaultPool(
+            IERC4626(address(vaultA)), IERC4626(address(vaultB)), FEE, TICK_SPACING, SQRT_PRICE_X96
+        );
+
+        //we swap vault addresses this time but it should still fail due collision
+        vm.expectRevert(LibClone.DeploymentFailed.selector);
+        factory.createERC4626VaultPool(
+            IERC4626(address(vaultB)), IERC4626(address(vaultA)), FEE, TICK_SPACING, SQRT_PRICE_X96
+        );
+
+        factory.createAavePool(address(aTokenA), address(aTokenB), FEE, TICK_SPACING, SQRT_PRICE_X96);
+
+        vm.expectRevert(LibClone.DeploymentFailed.selector);
+        factory.createAavePool(address(aTokenB), address(aTokenA), FEE, TICK_SPACING, SQRT_PRICE_X96);
+    }
+
     function _generateSalt(address token0, address token1, uint24 fee, int24 tickSpacing)
         internal
         pure
