@@ -18,6 +18,7 @@ import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {Fuzzers} from "lib/v4-periphery/lib/v4-core/src/test/Fuzzers.sol";
 import {CustomRevert} from "lib/v4-periphery/lib/v4-core/src/libraries/CustomRevert.sol";
 import {HookMiner} from "lib/v4-periphery/src/utils/HookMiner.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 
 import {YieldHarvestingHook} from "src/YieldHarvestingHook.sol";
 import {ERC4626VaultWrapperFactory} from "src/ERC4626VaultWrapperFactory.sol";
@@ -28,6 +29,7 @@ import {MockERC20} from "test/utils/MockERC20.sol";
 import {FeeMath, PositionConfig} from "test/utils/libraries/FeeMath.sol";
 import {IERC4626} from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import {Constants} from "@uniswap/v4-core/test/utils/Constants.sol";
+import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "forge-std/console.sol";
 
 contract YieldHarvestingHookTest is Fuzzers, Test {
@@ -285,7 +287,25 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
         vaultWrapper0.approve(address(swapRouter), type(uint256).max);
         vaultWrapper1.approve(address(swapRouter), type(uint256).max);
+
+        uint256 vaultWrapper0TotalSupplyBefore = vaultWrapper0.totalSupply();
+        uint256 vaultWrapper1TotalSupplyBefore = vaultWrapper1.totalSupply();
+
         swapRouter.swap(poolKey, swapParams, PoolSwapTest.TestSettings({takeClaims: true, settleUsingBurn: false}), "");
+
+        //make sure totalSupply of vault wrappers have increased by yield
+        assertApproxEqAbs(
+            vaultWrapper0.totalSupply() - vaultWrapper0TotalSupplyBefore,
+            yield0,
+            1,
+            "VaultWrapper0 totalSupply should increase by yield0"
+        );
+        assertApproxEqAbs(
+            vaultWrapper1.totalSupply() - vaultWrapper1TotalSupplyBefore,
+            yield1,
+            1,
+            "VaultWrapper1 totalSupply should increase by yield1"
+        );
 
         //make sure balance has increase by yield0 and yield1
         assertApproxEqAbs(
@@ -424,8 +444,17 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
         mixedVaultWrapper.approve(address(swapRouter), type(uint256).max);
         rawAsset.approve(address(swapRouter), type(uint256).max);
+
+        uint256 mixedVaultAssetTotalSupplyBefore = mixedVaultWrapper.totalSupply();
         swapRouter.swap(
             mixedPoolKey, swapParams, PoolSwapTest.TestSettings({takeClaims: true, settleUsingBurn: false}), ""
+        );
+
+        assertApproxEqAbs(
+            mixedVaultWrapper.totalSupply() - mixedVaultAssetTotalSupplyBefore,
+            vaultYield,
+            1,
+            "MixedVaultWrapper totalSupply should increase by vault yield"
         );
 
         // Check that yield was harvested for the vault wrapper currency only
