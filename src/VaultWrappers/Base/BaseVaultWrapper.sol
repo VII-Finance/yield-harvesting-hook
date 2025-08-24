@@ -29,7 +29,7 @@ abstract contract BaseVaultWrapper is ERC4626, IVaultWrapper {
 
     event FeeParametersSet(uint256 feeDivisor, address feeReceiver);
 
-    constructor() ERC4626(IERC20(address(0))) ERC20("VII Finance - Vault Wrapper Implementation", "VII-VWIMP") {}
+    constructor() ERC4626(IERC20(address(0))) ERC20("", "") {}
 
     function getFactory() public view returns (address) {
         return getImmutableArgAddress(FACTORY_OFFSET);
