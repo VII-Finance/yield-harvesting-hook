@@ -6,7 +6,7 @@ import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol"
 import {Math} from "lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import {IERC4626} from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 
-import {BaseVaultWrapper} from "src/VaultWrappers/Base/BaseVaultWrapper.sol";
+import {BaseVaultWrapper} from "src/vaultWrappers/base/BaseVaultWrapper.sol";
 
 /**
  * @notice This vault wrapper is intended for use with lending protocol vaults where the underlying vault share price monotonically increases.

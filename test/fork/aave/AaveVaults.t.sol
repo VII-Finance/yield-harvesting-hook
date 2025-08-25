@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.13;
 
-import {BaseVaultsTest} from "test/fork/Base/BaseVaultsTest.t.sol";
+import {BaseVaultsTest} from "test/fork/BaseVaultsTest.t.sol";
 import {MockERC4626} from "test/utils/MockERC4626.sol";
 import {MockERC20} from "test/utils/MockERC20.sol";
 import {IPool} from "@aave-v3-core/interfaces/IPool.sol";
