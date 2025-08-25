@@ -14,8 +14,8 @@ The protocol achieves this by wrapping yield-bearing tokens (such as ERC4626 vau
 src/
 ├── YieldHarvestingHook.sol           # Main Uniswap V4 hook
 ├── ERC4626VaultWrapperFactory.sol    # Factory for creating pools
-└── VaultWrappers/
-    ├── Base/BaseVaultWrapper.sol     # Shared wrapper logic
+└── vaultWrappers/
+    ├── base/BaseVaultWrapper.sol     # Shared wrapper logic
     ├── ERC4626VaultWrapper.sol       # ERC4626 vault wrapper
     └── AaveWrapper.sol               # Aave aToken wrapper
 ```

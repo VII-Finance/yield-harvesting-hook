@@ -22,8 +22,8 @@ import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 
 import {YieldHarvestingHook} from "src/YieldHarvestingHook.sol";
 import {ERC4626VaultWrapperFactory} from "src/ERC4626VaultWrapperFactory.sol";
-import {ERC4626VaultWrapper} from "src/VaultWrappers/ERC4626VaultWrapper.sol";
-import {BaseVaultWrapper} from "src/VaultWrappers/Base/BaseVaultWrapper.sol";
+import {ERC4626VaultWrapper} from "src/vaultWrappers/ERC4626VaultWrapper.sol";
+import {BaseVaultWrapper} from "src/vaultWrappers/base/BaseVaultWrapper.sol";
 import {MockERC4626} from "test/utils/MockERC4626.sol";
 import {MockERC20} from "test/utils/MockERC20.sol";
 import {FeeMath, PositionConfig} from "test/utils/libraries/FeeMath.sol";

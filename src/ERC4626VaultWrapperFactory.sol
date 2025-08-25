@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.26;
 
-import {ERC4626VaultWrapper} from "src/VaultWrappers/ERC4626VaultWrapper.sol";
-import {BaseVaultWrapper} from "src/VaultWrappers/Base/BaseVaultWrapper.sol";
+import {ERC4626VaultWrapper} from "src/vaultWrappers/ERC4626VaultWrapper.sol";
+import {BaseVaultWrapper} from "src/vaultWrappers/base/BaseVaultWrapper.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IERC4626} from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {LibClone} from "lib/solady/src/utils/LibClone.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
-import {AaveWrapper} from "src/VaultWrappers/AaveWrapper.sol";
+import {AaveWrapper} from "src/vaultWrappers/AaveWrapper.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 /// @notice The factory does not perform strict sanity checks on the provided addresses to ensure they match the expected types.
