@@ -230,11 +230,15 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
     }
 
     function _deposit(MockERC4626 vault, uint256 amount, address to) internal virtual returns (uint256) {
-        //assume this address has the necessary amount of tokens
-        deal(address(vault.asset()), address(this), amount);
+        if (vault.previewDeposit(amount) > 0) {
+            //assume this address has the necessary amount of tokens
+            deal(address(vault.asset()), address(this), amount);
 
-        vault.asset().approve(address(vault), amount);
-        return vault.deposit(amount, to);
+            vault.asset().approve(address(vault), amount);
+            return vault.deposit(amount, to);
+        } else {
+            return 0;
+        }
     }
 
     function _mintYieldToVaults(uint256 yield0, uint256 yield1) internal virtual returns (uint256, uint256) {
@@ -251,6 +255,57 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         }
 
         return (yield0, yield1);
+    }
+
+    function test_yieldAndHarvestBeforeRemoveLiquidity(uint256 yield0, uint256 yield1, bool isAaveWrapper) public {
+        setUpVaults(isAaveWrapper);
+
+        uint256 underlyingVaultShares0 = _deposit(underlyingVault0, 20_000, address(this));
+        uint256 underlyingVaultShares1 = _deposit(underlyingVault1, 20_000, address(this));
+
+        underlyingVault0.approve(address(vaultWrapper0), underlyingVaultShares0);
+        underlyingVault1.approve(address(vaultWrapper1), underlyingVaultShares1);
+
+        vaultWrapper0.deposit(underlyingVaultShares0, address(this));
+        vaultWrapper1.deposit(underlyingVaultShares1, address(this));
+
+        vaultWrapper0.approve(address(modifyLiquidityRouter), type(uint256).max);
+        vaultWrapper1.approve(address(modifyLiquidityRouter), type(uint256).max);
+
+        ModifyLiquidityParams memory params = ModifyLiquidityParams({
+            tickLower: TickMath.minUsableTick(poolKey.tickSpacing),
+            tickUpper: TickMath.maxUsableTick(poolKey.tickSpacing),
+            liquidityDelta: 1,
+            salt: 0
+        });
+
+        modifyLiquidityRouter.modifyLiquidity(poolKey, params, "");
+
+        (yield0, yield1) = _mintYieldToVaults(yield0, yield1);
+
+        //now we mint some yield to the underlying vaults and again remove 0 wei of liquidity
+        //this should trigger yieldAndHarvestHook
+
+        uint256 vaultWrapper0TotalSupplyBefore = vaultWrapper0.totalSupply();
+        uint256 vaultWrapper1TotalSupplyBefore = vaultWrapper1.totalSupply();
+
+        params.liquidityDelta = 0;
+
+        modifyLiquidityRouter.modifyLiquidity(poolKey, params, "");
+
+        //make sure totalSupply of vault wrappers have increased by yield
+        assertApproxEqAbs(
+            vaultWrapper0.totalSupply() - vaultWrapper0TotalSupplyBefore,
+            yield0,
+            1,
+            "VaultWrapper0 totalSupply should increase by yield0"
+        );
+        assertApproxEqAbs(
+            vaultWrapper1.totalSupply() - vaultWrapper1TotalSupplyBefore,
+            yield1,
+            1,
+            "VaultWrapper1 totalSupply should increase by yield1"
+        );
     }
 
     function test_yieldAndHarvestBeforeSwap(
