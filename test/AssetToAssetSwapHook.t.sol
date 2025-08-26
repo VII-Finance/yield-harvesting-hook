@@ -21,6 +21,7 @@ import {EthereumVaultConnector} from "ethereum-vault-connector//EthereumVaultCon
 import {
     PositionManager, IAllowanceTransfer, IPositionDescriptor, IWETH9
 } from "lib/v4-periphery/src/PositionManager.sol";
+import {WETH} from "lib/solady/src/tokens/WETH.sol";
 
 contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
     PositionManager public positionManager;
@@ -40,6 +41,7 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
         super.setUp();
 
         evc = address(new EthereumVaultConnector());
+        weth = address(new WETH());
         positionManager = new PositionManager(
             poolManager, IAllowanceTransfer(address(0)), 0, IPositionDescriptor(address(0)), IWETH9(address(weth))
         );
@@ -139,5 +141,46 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
 
         uint256 asset1In = SafeCast.toUint256(-swapDelta.amount1());
         assertEq(asset1In, asset1BalanceBefore - asset1.balanceOf(address(this)), "Incorrect asset1 out amount");
+    }
+
+    function testMintAndIncreasePosition(uint128 liquidityToAdd) public {
+        liquidityToAdd = uint128(bound(liquidityToAdd, 1, 1e18));
+
+        int24 tickUpper = TickMath.maxUsableTick(poolKey.tickSpacing);
+        int24 tickLower = TickMath.minUsableTick(poolKey.tickSpacing);
+
+        deal(address(asset0), address(this), liquidityToAdd);
+        deal(address(asset1), address(this), liquidityToAdd);
+
+        asset0.approve(address(assetToAssetSwapHook), type(uint256).max);
+        asset1.approve(address(assetToAssetSwapHook), type(uint256).max);
+
+        poolKey.currency0 = Currency.wrap(address(asset0));
+        poolKey.currency1 = Currency.wrap(address(asset1));
+
+        (uint256 tokenId) = assetToAssetSwapHook.mintPosition(
+            poolKey,
+            tickLower,
+            tickUpper,
+            liquidityToAdd,
+            uint128(liquidityToAdd),
+            uint128(liquidityToAdd),
+            address(this),
+            abi.encode(vaultWrapper0, vaultWrapper1)
+        );
+
+        deal(address(asset0), address(this), liquidityToAdd);
+        deal(address(asset1), address(this), liquidityToAdd);
+
+        positionManager.approve(address(assetToAssetSwapHook), tokenId);
+
+        assetToAssetSwapHook.increaseLiquidity(
+            poolKey,
+            tokenId,
+            liquidityToAdd,
+            uint128(liquidityToAdd),
+            uint128(liquidityToAdd),
+            abi.encode(vaultWrapper0, vaultWrapper1)
+        );
     }
 }

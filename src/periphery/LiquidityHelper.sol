@@ -58,15 +58,15 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
         return underlyingVault;
     }
 
-    function _modifyLiquidity(
+    function _pullAndConvertAssets(
         PoolKey memory poolKey,
-        uint8 actionType, // either Actions.MINT_POSITION or Actions.INCREASE_LIQUIDITY
-        bytes memory actionData, // encoded params for first action
         uint128 amount0Max,
         uint128 amount1Max,
         bytes calldata hookData
-    ) internal {
-        (IERC4626 vaultWrapper0, IERC4626 vaultWrapper1) = abi.decode(hookData, (IERC4626, IERC4626));
+    ) internal returns (PoolKey memory) {
+        (IERC4626 vaultWrapper0, IERC4626 vaultWrapper1) = hookData.length == 0
+            ? (IERC4626(address(0)), IERC4626(address(0)))
+            : abi.decode(hookData, (IERC4626, IERC4626));
         if (amount0Max != 0) {
             if (!poolKey.currency0.isAddressZero()) {
                 IERC20(Currency.unwrap(poolKey.currency0)).safeTransferFrom(_msgSender(), address(this), amount0Max);
@@ -125,6 +125,14 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
             (poolKey.currency0, poolKey.currency1) = (poolKey.currency1, poolKey.currency0);
         }
 
+        return poolKey;
+    }
+
+    function _callModifyLiquidity(
+        uint8 actionType, // either Actions.MINT_POSITION or Actions.INCREASE_LIQUIDITY
+        bytes memory actionData, // encoded params for first action,
+        PoolKey memory poolKey
+    ) internal {
         bytes memory actions = new bytes(5);
         actions[0] = bytes1(actionType);
         actions[1] = bytes1(uint8(Actions.SETTLE));
@@ -143,7 +151,7 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
     }
 
     function mintPosition(
-        PoolKey calldata poolKey,
+        PoolKey memory poolKey,
         int24 tickLower,
         int24 tickUpper,
         uint256 liquidity,
@@ -154,14 +162,16 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
     ) external payable returns (uint256 tokenId) {
         tokenId = positionManager.nextTokenId();
 
+        poolKey = _pullAndConvertAssets(poolKey, amount0Max, amount1Max, hookData);
+
         bytes memory actionData =
             abi.encode(poolKey, tickLower, tickUpper, liquidity, amount0Max, amount1Max, owner, "");
 
-        _modifyLiquidity(poolKey, uint8(Actions.MINT_POSITION), actionData, amount0Max, amount1Max, hookData);
+        _callModifyLiquidity(uint8(Actions.MINT_POSITION), actionData, poolKey);
     }
 
     function increaseLiquidity(
-        PoolKey calldata poolKey,
+        PoolKey memory poolKey,
         uint256 tokenId,
         uint256 liquidity,
         uint128 amount0Max,
@@ -172,7 +182,9 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
         if (IERC721(address(positionManager)).ownerOf(tokenId) != _msgSender()) {
             revert NotOwner();
         }
+        poolKey = _pullAndConvertAssets(poolKey, amount0Max, amount1Max, hookData);
+
         bytes memory actionData = abi.encode(tokenId, liquidity, amount0Max, amount1Max, "");
-        _modifyLiquidity(poolKey, uint8(Actions.INCREASE_LIQUIDITY), actionData, amount0Max, amount1Max, hookData);
+        _callModifyLiquidity(uint8(Actions.INCREASE_LIQUIDITY), actionData, poolKey);
     }
 }
