@@ -17,8 +17,15 @@ import {PoolManager} from "@uniswap/v4-core/src/PoolManager.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 import {IERC4626} from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
+import {EthereumVaultConnector} from "ethereum-vault-connector//EthereumVaultConnector.sol";
+import {
+    PositionManager, IAllowanceTransfer, IPositionDescriptor, IWETH9
+} from "lib/v4-periphery/src/PositionManager.sol";
 
 contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
+    PositionManager public positionManager;
+    address public weth;
+    address public evc;
     AssetToAssetSwapHookForERC4626 assetToAssetSwapHook;
 
     using StateLibrary for PoolManager;
@@ -31,6 +38,11 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
 
     function setUp() public override {
         super.setUp();
+
+        evc = address(new EthereumVaultConnector());
+        positionManager = new PositionManager(
+            poolManager, IAllowanceTransfer(address(0)), 0, IPositionDescriptor(address(0)), IWETH9(address(weth))
+        );
 
         setUpVaults(false);
 
@@ -56,10 +68,11 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
             address(this),
             SWAP_HOOK_PERMISSIONS,
             type(AssetToAssetSwapHookForERC4626).creationCode,
-            abi.encode(poolManager, yieldHarvestingHook)
+            abi.encode(evc, poolManager, positionManager, yieldHarvestingHook)
         );
 
-        assetToAssetSwapHook = new AssetToAssetSwapHookForERC4626{salt: salt}(poolManager, yieldHarvestingHook);
+        assetToAssetSwapHook =
+            new AssetToAssetSwapHookForERC4626{salt: salt}(evc, poolManager, positionManager, yieldHarvestingHook);
 
         assetsPoolKey = PoolKey({
             currency0: isCurrency0SameAsAsset0 ? Currency.wrap(address(asset0)) : Currency.wrap(address(asset1)),
