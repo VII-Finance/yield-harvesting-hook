@@ -49,6 +49,13 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
         weth = IWETH9(IPositionManagerExtended(address(_positionManager)).WETH9());
     }
 
+    modifier onlyOwnerOf(uint256 tokenId) {
+        if (IERC721(address(positionManager)).ownerOf(tokenId) != _msgSender()) {
+            revert NotOwner();
+        }
+        _;
+    }
+
     function _getUnderlyingVault(IERC4626 vaultWrapper) internal view returns (IERC4626 underlyingVault) {
         try vaultWrapper.asset() returns (address asset) {
             underlyingVault = IERC4626(asset);
@@ -177,14 +184,95 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
         uint128 amount0Max,
         uint128 amount1Max,
         bytes calldata hookData
-    ) external payable {
-        //it is expected that the user has approved tokenId to this contract, otherwise increasing liquidity on behalf of someone else is not allowed
-        if (IERC721(address(positionManager)).ownerOf(tokenId) != _msgSender()) {
-            revert NotOwner();
-        }
+    ) external payable onlyOwnerOf(tokenId) {
         poolKey = _pullAndConvertAssets(poolKey, amount0Max, amount1Max, hookData);
 
         bytes memory actionData = abi.encode(tokenId, liquidity, amount0Max, amount1Max, "");
         _callModifyLiquidity(uint8(Actions.INCREASE_LIQUIDITY), actionData, poolKey);
+    }
+
+    function decreaseLiquidity(
+        PoolKey memory poolKey,
+        uint256 tokenId,
+        uint128 liquidity,
+        uint128 amount0Min,
+        uint128 amount1Min,
+        address recipient,
+        bytes calldata hookData
+    ) public onlyOwnerOf(tokenId) {
+        //it is expected that the user has approved tokenId to this contract, otherwise decreasing liquidity on behalf of someone else is not allowed
+        if (IERC721(address(positionManager)).ownerOf(tokenId) != _msgSender()) {
+            revert NotOwner();
+        }
+
+        Currency currency0 = poolKey.currency0;
+        Currency currency1 = poolKey.currency1;
+
+        (IERC4626 vaultWrapper0, IERC4626 vaultWrapper1) = hookData.length == 0
+            ? (IERC4626(address(0)), IERC4626(address(0)))
+            : abi.decode(hookData, (IERC4626, IERC4626));
+
+        if (address(vaultWrapper0) != address(0)) {
+            poolKey.currency0 = Currency.wrap(address(vaultWrapper0));
+            poolKey.hooks = yieldHarvestingHook;
+        }
+        if (address(vaultWrapper1) != address(0)) {
+            poolKey.currency1 = Currency.wrap(address(vaultWrapper1));
+            poolKey.hooks = yieldHarvestingHook;
+        }
+
+        if (Currency.unwrap(poolKey.currency0) > Currency.unwrap(poolKey.currency1)) {
+            (poolKey.currency0, poolKey.currency1) = (poolKey.currency1, poolKey.currency0);
+        }
+
+        bytes memory actions = new bytes(2);
+        actions[0] = bytes1(uint8(Actions.DECREASE_LIQUIDITY));
+        actions[1] = bytes1(uint8(Actions.TAKE_PAIR));
+
+        bytes[] memory params = new bytes[](2);
+        params[0] = abi.encode(tokenId, liquidity, amount0Min, amount1Min, "");
+        params[1] = abi.encode(poolKey.currency0, poolKey.currency1, ActionConstants.MSG_SENDER);
+
+        positionManager.modifyLiquidities{value: address(this).balance}(abi.encode(actions, params), block.timestamp);
+
+        //this contract will have the tokens after decreasing liquidity, now we need to withdraw from vault wrappers if needed and send to recipient
+        if (address(vaultWrapper0) != address(0)) {
+            IERC4626 underlyingVault0 = _getUnderlyingVault(vaultWrapper0);
+            _withdraw(
+                vaultWrapper0,
+                address(underlyingVault0),
+                address(this),
+                vaultWrapper0.balanceOf(address(this)),
+                recipient
+            );
+        } else {
+            //simply transfer the tokens to recipient
+            currency0.transfer(recipient, currency0.balanceOfSelf());
+        }
+
+        if (address(vaultWrapper1) != address(0)) {
+            IERC4626 underlyingVault1 = _getUnderlyingVault(vaultWrapper1);
+            _withdraw(
+                vaultWrapper1,
+                address(underlyingVault1),
+                address(this),
+                vaultWrapper1.balanceOf(address(this)),
+                recipient
+            );
+        } else {
+            //simply transfer the tokens to recipient
+            currency1.transfer(recipient, currency1.balanceOfSelf());
+        }
+    }
+
+    function collectFees(
+        PoolKey memory poolKey,
+        uint256 tokenId,
+        uint128 amount0Min,
+        uint128 amount1Min,
+        address recipient,
+        bytes calldata hookData
+    ) external {
+        decreaseLiquidity(poolKey, tokenId, 0, amount0Min, amount1Min, recipient, hookData);
     }
 }

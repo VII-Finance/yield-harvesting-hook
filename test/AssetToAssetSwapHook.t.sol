@@ -182,5 +182,9 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
             uint128(liquidityToAdd),
             abi.encode(vaultWrapper0, vaultWrapper1)
         );
+
+        assetToAssetSwapHook.decreaseLiquidity(
+            poolKey, tokenId, liquidityToAdd, 0, 0, address(this), abi.encode(vaultWrapper0, vaultWrapper1)
+        );
     }
 }
