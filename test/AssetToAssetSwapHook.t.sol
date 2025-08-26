@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {YieldHarvestingHookTest} from "test/YieldHarvestingHook.t.sol";
-import {AssetToAssetSwapHook} from "src/periphery/AssetToAssetSwapHook.sol";
+import {AssetToAssetSwapHookForERC4626} from "src/periphery/AssetToAssetSwapHookForERC4626.sol";
 import {HookMiner} from "lib/v4-periphery/src/utils/HookMiner.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
@@ -19,8 +19,7 @@ import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast
 import {IERC4626} from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 
 contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
-    AssetToAssetSwapHook assetToAssetSwapHook;
-    AssetToAssetSwapHook mixedAssetToAssetSwapHook;
+    AssetToAssetSwapHookForERC4626 assetToAssetSwapHook;
 
     using StateLibrary for PoolManager;
 
@@ -56,40 +55,11 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
         (, bytes32 salt) = HookMiner.find(
             address(this),
             SWAP_HOOK_PERMISSIONS,
-            type(AssetToAssetSwapHook).creationCode,
-            abi.encode(
-                poolManager,
-                isCurrency0SameAsAsset0 ? vaultWrapper0 : vaultWrapper1,
-                isCurrency0SameAsAsset0 ? vaultWrapper1 : vaultWrapper0,
-                yieldHarvestingHook
-            )
+            type(AssetToAssetSwapHookForERC4626).creationCode,
+            abi.encode(poolManager, yieldHarvestingHook)
         );
 
-        (, bytes32 mixedSalt) = HookMiner.find(
-            address(this),
-            SWAP_HOOK_PERMISSIONS,
-            type(AssetToAssetSwapHook).creationCode,
-            abi.encode(
-                poolManager,
-                address(rawAsset) < address(mixedVaultWrapper) ? IERC4626(address(rawAsset)) : mixedVaultWrapper,
-                address(rawAsset) < address(mixedVaultWrapper) ? mixedVaultWrapper : IERC4626(address(rawAsset)),
-                yieldHarvestingHook
-            )
-        );
-
-        assetToAssetSwapHook = new AssetToAssetSwapHook{salt: salt}(
-            poolManager,
-            isCurrency0SameAsAsset0 ? vaultWrapper0 : vaultWrapper1,
-            isCurrency0SameAsAsset0 ? vaultWrapper1 : vaultWrapper0,
-            yieldHarvestingHook
-        );
-
-        mixedAssetToAssetSwapHook = new AssetToAssetSwapHook{salt: mixedSalt}(
-            poolManager,
-            address(rawAsset) < address(mixedVaultWrapper) ? IERC4626(address(rawAsset)) : mixedVaultWrapper,
-            address(rawAsset) < address(mixedVaultWrapper) ? mixedVaultWrapper : IERC4626(address(rawAsset)),
-            yieldHarvestingHook
-        );
+        assetToAssetSwapHook = new AssetToAssetSwapHookForERC4626{salt: salt}(poolManager, yieldHarvestingHook);
 
         assetsPoolKey = PoolKey({
             currency0: isCurrency0SameAsAsset0 ? Currency.wrap(address(asset0)) : Currency.wrap(address(asset1)),
@@ -99,21 +69,7 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
             hooks: assetToAssetSwapHook
         });
 
-        mixedAssetPoolKey = PoolKey({
-            currency0: address(rawAsset) < address(mixedVaultAsset)
-                ? Currency.wrap(address(rawAsset))
-                : Currency.wrap(address(mixedVaultAsset)),
-            currency1: address(rawAsset) < address(mixedVaultAsset)
-                ? Currency.wrap(address(mixedVaultAsset))
-                : Currency.wrap(address(rawAsset)),
-            fee: poolKey.fee,
-            tickSpacing: poolKey.tickSpacing,
-            hooks: mixedAssetToAssetSwapHook
-        });
-
         poolManager.initialize(assetsPoolKey, Constants.SQRT_PRICE_1_1);
-
-        poolManager.initialize(mixedAssetPoolKey, Constants.SQRT_PRICE_1_1);
     }
 
     function test_assetsSwapExactAmountIn() public {
@@ -134,7 +90,10 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
         });
 
         BalanceDelta swapDelta = swapRouter.swap(
-            assetsPoolKey, swapParams, PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}), ""
+            assetsPoolKey,
+            swapParams,
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            abi.encode(vaultWrapper0, vaultWrapper1)
         );
 
         uint256 asset1Out = SafeCast.toUint256(swapDelta.amount1());
@@ -159,7 +118,10 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
         });
 
         BalanceDelta swapDelta = swapRouter.swap(
-            assetsPoolKey, swapParams, PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}), ""
+            assetsPoolKey,
+            swapParams,
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            abi.encode(vaultWrapper0, vaultWrapper1)
         );
 
         uint256 asset1In = SafeCast.toUint256(-swapDelta.amount1());

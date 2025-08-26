@@ -21,51 +21,28 @@ import {BaseAssetToVaultWrapperHelper} from "src/periphery/Base/BaseAssetToVault
 import {IHookEvents} from "src/interfaces/IHookEvents.sol";
 import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 
-contract AssetToAssetSwapHook is BaseHook, BaseAssetToVaultWrapperHelper, IHookEvents {
+///@dev This doesn't support aave vaults. Only vault wrappers that have underlying vaults that support ERC4626 interface are supported
+contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelper, IHookEvents {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
     using SafeCast for int256;
     using SafeCast for int128;
 
-    /// @notice The vault wrapper for currency0
-    IERC4626 public immutable vaultWrapper0;
-
-    /// @notice The vault wrapper for currency1
-    IERC4626 public immutable vaultWrapper1;
-
-    IERC4626 public immutable underlyingVault0;
-
-    IERC4626 public immutable underlyingVault1;
-
     /// @notice The hooks contract for vault wrapper pools
-    IHooks public immutable hooks;
+    IHooks public immutable yieldHarvestingHook;
 
-    constructor(IPoolManager poolManager, IERC4626 _vaultWrapper0, IERC4626 _vaultWrapper1, IHooks _hooks)
-        BaseHook(poolManager)
-    {
-        vaultWrapper0 = _vaultWrapper0;
-        vaultWrapper1 = _vaultWrapper1;
-        try _vaultWrapper0.asset() returns (address asset0) {
-            underlyingVault0 = IERC4626(asset0);
-        } catch {
-            underlyingVault0 = IERC4626(address(0));
-        }
-        try _vaultWrapper1.asset() returns (address asset1) {
-            underlyingVault1 = IERC4626(asset1);
-        } catch {
-            underlyingVault1 = IERC4626(address(0));
-        }
-        hooks = _hooks;
+    constructor(IPoolManager poolManager, IHooks _yieldHarvestingHook) BaseHook(poolManager) {
+        yieldHarvestingHook = _yieldHarvestingHook;
     }
 
-    function _beforeSwap(address sender, PoolKey calldata key, SwapParams calldata params, bytes calldata)
+    function _beforeSwap(address, PoolKey calldata key, SwapParams calldata params, bytes calldata hookData)
         internal
         override
         returns (bytes4, BeforeSwapDelta, uint24)
     {
         bool isExactInput = params.amountSpecified < 0;
 
-        SwapContext memory context = _initializeSwapContext(key, params);
+        SwapContext memory context = _initializeSwapContext(key, params, hookData);
 
         uint256 amountIn;
         uint256 amountOut;
@@ -95,11 +72,27 @@ contract AssetToAssetSwapHook is BaseHook, BaseAssetToVaultWrapperHelper, IHookE
     }
 
     /// @dev Initialize swap context with vault wrappers and assets
-    function _initializeSwapContext(PoolKey calldata key, SwapParams calldata params)
+    function _initializeSwapContext(PoolKey calldata key, SwapParams calldata params, bytes calldata hookData)
         private
         view
         returns (SwapContext memory context)
     {
+        (IERC4626 vaultWrapper0, IERC4626 vaultWrapper1) = abi.decode(hookData, (IERC4626, IERC4626));
+
+        IERC4626 underlyingVault0;
+        IERC4626 underlyingVault1;
+        try vaultWrapper0.asset() returns (address asset0) {
+            underlyingVault0 = IERC4626(asset0);
+        } catch {
+            underlyingVault0 = IERC4626(address(0));
+        }
+
+        try vaultWrapper1.asset() returns (address asset1) {
+            underlyingVault1 = IERC4626(asset1);
+        } catch {
+            underlyingVault1 = IERC4626(address(0));
+        }
+
         (context.vaultWrapperIn, context.vaultWrapperOut) =
             params.zeroForOne ? (vaultWrapper0, vaultWrapper1) : (vaultWrapper1, vaultWrapper0);
 
@@ -116,7 +109,7 @@ contract AssetToAssetSwapHook is BaseHook, BaseAssetToVaultWrapperHelper, IHookE
             currency1: Currency.wrap(address(vaultWrapper1)),
             fee: key.fee,
             tickSpacing: key.tickSpacing,
-            hooks: hooks
+            hooks: yieldHarvestingHook
         });
     }
 
@@ -189,25 +182,6 @@ contract AssetToAssetSwapHook is BaseHook, BaseAssetToVaultWrapperHelper, IHookE
         _mintVaultWrapperShares(
             context.assetIn, context.underlyingVaultIn, context.vaultWrapperIn, amountIn, vaultWrapperInAmount
         );
-    }
-
-    function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
-        return Hooks.Permissions({
-            beforeInitialize: false,
-            afterInitialize: false,
-            beforeAddLiquidity: false,
-            afterAddLiquidity: false,
-            beforeRemoveLiquidity: false,
-            afterRemoveLiquidity: false,
-            beforeSwap: true,
-            afterSwap: false,
-            beforeDonate: false,
-            afterDonate: false,
-            beforeSwapReturnDelta: true,
-            afterSwapReturnDelta: false,
-            afterAddLiquidityReturnDelta: false,
-            afterRemoveLiquidityReturnDelta: false
-        });
     }
 
     /// @dev Calculate the return delta for the swap
@@ -321,5 +295,24 @@ contract AssetToAssetSwapHook is BaseHook, BaseAssetToVaultWrapperHelper, IHookE
             SafeERC20.safeTransfer(asset, address(poolManager), amountOut);
         }
         poolManager.settle();
+    }
+
+    function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
+        return Hooks.Permissions({
+            beforeInitialize: false,
+            afterInitialize: false,
+            beforeAddLiquidity: false,
+            afterAddLiquidity: false,
+            beforeRemoveLiquidity: false,
+            afterRemoveLiquidity: false,
+            beforeSwap: true,
+            afterSwap: false,
+            beforeDonate: false,
+            afterDonate: false,
+            beforeSwapReturnDelta: true,
+            afterSwapReturnDelta: false,
+            afterAddLiquidityReturnDelta: false,
+            afterRemoveLiquidityReturnDelta: false
+        });
     }
 }
