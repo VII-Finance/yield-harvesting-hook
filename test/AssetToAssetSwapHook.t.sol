@@ -22,6 +22,7 @@ import {
     PositionManager, IAllowanceTransfer, IPositionDescriptor, IWETH9
 } from "lib/v4-periphery/src/PositionManager.sol";
 import {WETH} from "lib/solady/src/tokens/WETH.sol";
+import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
     PositionManager public positionManager;
@@ -87,16 +88,37 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
         poolManager.initialize(assetsPoolKey, Constants.SQRT_PRICE_1_1);
     }
 
+    function _currencyToIERC20(Currency currency) internal pure returns (IERC20) {
+        return IERC20(Currency.unwrap(currency));
+    }
+
+    function sortVaultWrappers(IERC4626 vaultWrapperA, IERC4626 vaultWrapperB, address asset0, address asset1)
+        internal
+        view
+        returns (IERC4626 vaultWrapper0, IERC4626 vaultWrapper1)
+    {
+        IERC4626 underlyingVaultA = IERC4626(vaultWrapperA.asset());
+        IERC4626 underlyingVaultB = IERC4626(vaultWrapperB.asset());
+
+        if (underlyingVaultA.asset() == asset0 && underlyingVaultB.asset() == asset1) {
+            return (vaultWrapperA, vaultWrapperB);
+        } else if (underlyingVaultA.asset() == asset1 && underlyingVaultB.asset() == asset0) {
+            return (vaultWrapperB, vaultWrapperA);
+        } else {
+            revert("Vault wrappers do not wrap the correct assets");
+        }
+    }
+
     function test_assetsSwapExactAmountIn() public {
         uint256 amountIn = 1e18;
 
-        asset0.mint(address(this), amountIn);
-        asset0.approve(address(swapRouter), amountIn);
+        deal(Currency.unwrap(assetsPoolKey.currency0), address(this), amountIn);
+        _currencyToIERC20(assetsPoolKey.currency0).approve(address(swapRouter), amountIn);
 
         //we assume that prior to the mint, poolManager already has some asset0 that user can take it out of
-        asset0.mint(address(poolManager), amountIn);
+        deal(Currency.unwrap(assetsPoolKey.currency0), address(poolManager), amountIn);
 
-        uint256 asset1BalanceBefore = asset1.balanceOf(address(this));
+        uint256 asset1BalanceBefore = assetsPoolKey.currency1.balanceOf(address(this));
 
         SwapParams memory swapParams = SwapParams({
             zeroForOne: true,
@@ -104,27 +126,40 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
             sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
         });
 
+        (IERC4626 associatedVault0, IERC4626 associatedVault1) = sortVaultWrappers(
+            vaultWrapper0,
+            vaultWrapper1,
+            Currency.unwrap(assetsPoolKey.currency0),
+            Currency.unwrap(assetsPoolKey.currency1)
+        );
+
         BalanceDelta swapDelta = swapRouter.swap(
             assetsPoolKey,
             swapParams,
             PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
-            abi.encode(vaultWrapper0, vaultWrapper1)
+            abi.encode(associatedVault0, associatedVault1)
         );
 
         uint256 asset1Out = SafeCast.toUint256(swapDelta.amount1());
-        assertEq(asset1Out, asset1.balanceOf(address(this)) - asset1BalanceBefore, "Incorrect asset1 out amount");
+        assertEq(
+            asset1Out,
+            assetsPoolKey.currency1.balanceOf(address(this)) - asset1BalanceBefore,
+            "Incorrect asset1 out amount"
+        );
     }
 
     function test_assetsSwapExactAmountOut() public {
         uint256 amountOut = 1e18;
 
-        asset1.mint(address(this), 2 * amountOut);
-        asset1.approve(address(swapRouter), 2 * amountOut);
+        // asset1.mint(address(this), 2 * amountOut);
+        deal(Currency.unwrap(assetsPoolKey.currency1), address(this), 2 * amountOut);
+        _currencyToIERC20(assetsPoolKey.currency1).approve(address(swapRouter), 2 * amountOut);
 
         //we assume that prior to the swap, poolManager already has some asset1 that user can take it out of
-        asset1.mint(address(poolManager), 2 * amountOut);
+        // asset1.mint(address(poolManager), 2 * amountOut);
+        deal(Currency.unwrap(assetsPoolKey.currency1), address(poolManager), 2 * amountOut);
 
-        uint256 asset1BalanceBefore = asset1.balanceOf(address(this));
+        uint256 asset1BalanceBefore = assetsPoolKey.currency1.balanceOf(address(this));
 
         SwapParams memory swapParams = SwapParams({
             zeroForOne: false,
@@ -132,15 +167,22 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
             sqrtPriceLimitX96: TickMath.MAX_SQRT_PRICE - 1
         });
 
+        (IERC4626 associatedVault0, IERC4626 associatedVault1) =
+            sortVaultWrappers(vaultWrapper0, vaultWrapper1, address(asset0), address(asset1));
+
         BalanceDelta swapDelta = swapRouter.swap(
             assetsPoolKey,
             swapParams,
             PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
-            abi.encode(vaultWrapper0, vaultWrapper1)
+            abi.encode(address(associatedVault0), address(associatedVault1))
         );
 
         uint256 asset1In = SafeCast.toUint256(-swapDelta.amount1());
-        assertEq(asset1In, asset1BalanceBefore - asset1.balanceOf(address(this)), "Incorrect asset1 out amount");
+        assertEq(
+            asset1In,
+            asset1BalanceBefore - assetsPoolKey.currency1.balanceOf(address(this)),
+            "Incorrect asset1 out amount"
+        );
     }
 
     function testMintAndIncreasePosition(uint128 liquidityToAdd) public {

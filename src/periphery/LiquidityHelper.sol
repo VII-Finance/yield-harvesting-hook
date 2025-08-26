@@ -200,11 +200,6 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
         address recipient,
         bytes calldata hookData
     ) public onlyOwnerOf(tokenId) {
-        //it is expected that the user has approved tokenId to this contract, otherwise decreasing liquidity on behalf of someone else is not allowed
-        if (IERC721(address(positionManager)).ownerOf(tokenId) != _msgSender()) {
-            revert NotOwner();
-        }
-
         Currency currency0 = poolKey.currency0;
         Currency currency1 = poolKey.currency1;
 
