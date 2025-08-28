@@ -16,12 +16,12 @@ import {ERC4626VaultWrapperFactory} from "src/ERC4626VaultWrapperFactory.sol";
 contract YieldHarvestingHook is BaseHook {
     using StateLibrary for IPoolManager;
 
-    address public immutable erc4626VaultWrapperFactory;
+    address public immutable ERC4626_VAULT_WRAPPER_FACTORY;
 
     error NotFactory();
 
     constructor(address _owner, IPoolManager _manager) BaseHook(_manager) {
-        erc4626VaultWrapperFactory = address(new ERC4626VaultWrapperFactory(_owner, _manager, address(this)));
+        ERC4626_VAULT_WRAPPER_FACTORY = address(new ERC4626VaultWrapperFactory(_owner, _manager, address(this)));
     }
 
     modifier harvestAndDistributeYield(PoolKey calldata poolKey) {
@@ -72,7 +72,7 @@ contract YieldHarvestingHook is BaseHook {
 
     /// @notice Ensures that only the ERC4626 vault wrapper factory can initialize a pool with this hook
     function _beforeInitialize(address caller, PoolKey calldata, uint160) internal view override returns (bytes4) {
-        if (caller != erc4626VaultWrapperFactory) {
+        if (caller != ERC4626_VAULT_WRAPPER_FACTORY) {
             revert NotFactory();
         }
         return this.beforeInitialize.selector;

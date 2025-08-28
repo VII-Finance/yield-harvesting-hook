@@ -7,15 +7,15 @@ import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 
 contract BaseVaultsTest is YieldHarvestingHookTest {
-    address POOL_MANAGER = 0x000000000004444c5dc75cB358380D2e3dE08A90;
+    address poolManagerAddress = 0x000000000004444c5dc75cB358380D2e3dE08A90;
 
     function _getPoolManager() internal view override returns (PoolManager) {
-        return PoolManager(POOL_MANAGER);
+        return PoolManager(poolManagerAddress);
     }
 
     function setUp() public virtual override {
-        string memory fork_url = vm.envString("MAINNET_RPC_URL");
-        vm.createSelectFork(fork_url, 23101344);
+        string memory forkUrl = vm.envString("MAINNET_RPC_URL");
+        vm.createSelectFork(forkUrl, 23101344);
 
         super.setUp();
     }

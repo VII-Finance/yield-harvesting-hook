@@ -16,21 +16,16 @@ import {PoolSwapTest} from "@uniswap/v4-core/src/test/PoolSwapTest.sol";
 import {LiquidityAmounts} from "lib/v4-periphery/lib/v4-core/test/utils/LiquidityAmounts.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {Fuzzers} from "lib/v4-periphery/lib/v4-core/src/test/Fuzzers.sol";
-import {CustomRevert} from "lib/v4-periphery/lib/v4-core/src/libraries/CustomRevert.sol";
 import {HookMiner} from "lib/v4-periphery/src/utils/HookMiner.sol";
-import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 
 import {YieldHarvestingHook} from "src/YieldHarvestingHook.sol";
 import {ERC4626VaultWrapperFactory} from "src/ERC4626VaultWrapperFactory.sol";
-import {ERC4626VaultWrapper} from "src/vaultWrappers/ERC4626VaultWrapper.sol";
 import {BaseVaultWrapper} from "src/vaultWrappers/base/BaseVaultWrapper.sol";
 import {MockERC4626} from "test/utils/MockERC4626.sol";
 import {MockERC20} from "test/utils/MockERC20.sol";
 import {FeeMath, PositionConfig} from "test/utils/libraries/FeeMath.sol";
 import {IERC4626} from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import {Constants} from "@uniswap/v4-core/test/utils/Constants.sol";
-import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import "forge-std/console.sol";
 
 contract YieldHarvestingHookTest is Fuzzers, Test {
     using StateLibrary for PoolManager;
@@ -86,7 +81,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
         yieldHarvestingHook = new YieldHarvestingHook{salt: salt}(factoryOwner, poolManager);
 
-        vaultWrappersFactory = ERC4626VaultWrapperFactory(yieldHarvestingHook.erc4626VaultWrapperFactory());
+        vaultWrappersFactory = ERC4626VaultWrapperFactory(yieldHarvestingHook.ERC4626_VAULT_WRAPPER_FACTORY());
     }
 
     function _getUnderlyingVaults() internal virtual returns (MockERC4626, MockERC4626) {
@@ -120,8 +115,8 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         MockERC20 assetB;
 
         if (isAaveWrapperTest) {
-            assetA = MockERC20(underlyingVaultA.UNDERLYING_ASSET_ADDRESS());
-            assetB = MockERC20(underlyingVaultB.UNDERLYING_ASSET_ADDRESS());
+            assetA = MockERC20(underlyingVaultA.underlyingAssetAddress());
+            assetB = MockERC20(underlyingVaultB.underlyingAssetAddress());
         } else {
             assetA = MockERC20(address(underlyingVaultA.asset()));
             assetB = MockERC20(address(underlyingVaultB.asset()));
@@ -135,7 +130,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
                 (address(underlyingVaultA)), (address(underlyingVaultB)), 3000, 60, _getInitialPrice()
             );
         } else {
-            (vaultWrapperA, vaultWrapperB) = vaultWrappersFactory.createERC4626VaultPool(
+            (vaultWrapperA, vaultWrapperB) = vaultWrappersFactory.createErc4626VaultPool(
                 IERC4626(address(underlyingVaultA)), IERC4626(address(underlyingVaultB)), 3000, 60, _getInitialPrice()
             );
         }
@@ -169,7 +164,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         // Setup mixed pool (vault + raw asset)
         (mixedVault, rawAsset) = _getMixedAssetsInfo();
         if (isAaveWrapperTest) {
-            mixedVaultAsset = MockERC20(mixedVault.UNDERLYING_ASSET_ADDRESS());
+            mixedVaultAsset = MockERC20(mixedVault.underlyingAssetAddress());
         } else {
             mixedVaultAsset = MockERC20(address(mixedVault.asset()));
         }
@@ -181,7 +176,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
                 address(mixedVault), address(rawAsset), 3000, 60, _getInitialPrice()
             );
         } else {
-            mixedVaultWrapper = vaultWrappersFactory.createERC4626VaultToTokenPool(
+            mixedVaultWrapper = vaultWrappersFactory.createErc4626VaultToTokenPool(
                 IERC4626(address(mixedVault)), address(rawAsset), 3000, 60, _getInitialPrice()
             );
         }
@@ -599,7 +594,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
     function testPoolInitializationFailsIfNotFactory(uint160 sqrtPriceX96, bool isAaveWrapper) public {
         setUpVaults(isAaveWrapper);
 
-        PoolKey memory PoolKeyNotYetInitialised = PoolKey({
+        PoolKey memory poolKeyNotYetInitialised = PoolKey({
             currency0: Currency.wrap(address(vaultWrapper0)),
             currency1: Currency.wrap(address(vaultWrapper1)),
             fee: 500,
@@ -607,6 +602,6 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
             hooks: yieldHarvestingHook
         });
         vm.expectRevert();
-        poolManager.initialize(PoolKeyNotYetInitialised, sqrtPriceX96);
+        poolManager.initialize(poolKeyNotYetInitialised, sqrtPriceX96);
     }
 }

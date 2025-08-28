@@ -6,12 +6,10 @@ import {MockERC4626} from "test/utils/MockERC4626.sol";
 import {MockERC20} from "test/utils/MockERC20.sol";
 import {IPool} from "@aave-v3-core/interfaces/IPool.sol";
 import {IAToken} from "@aave-v3-core/interfaces/IAToken.sol";
-import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
-import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 
 interface IATokenWithPool is IAToken {
     //This method is exposed by actual aTokens but it isn't in IAToken interface
-    function POOL() external view returns (address);
+    function pool() external view returns (address);
 }
 
 contract SparkLendTest is BaseVaultsTest {
@@ -40,7 +38,7 @@ contract SparkLendTest is BaseVaultsTest {
     function _deposit(MockERC4626 vault, uint256 amount, address to) internal override returns (uint256) {
         IAToken aToken = IAToken(address(vault));
         address underlyingAsset = aToken.UNDERLYING_ASSET_ADDRESS();
-        IPool pool = IPool(IATokenWithPool(address(aToken)).POOL());
+        IPool pool = IPool(IATokenWithPool(address(aToken)).pool());
 
         deal(underlyingAsset, address(this), amount);
         MockERC20(underlyingAsset).approve(address(pool), amount);

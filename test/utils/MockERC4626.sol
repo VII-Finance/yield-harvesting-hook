@@ -8,7 +8,7 @@ import {FullMath} from "lib/v4-periphery/lib/v4-core/src/libraries/FullMath.sol"
 contract MockERC4626 is ERC4626 {
     constructor(MockERC20 asset) ERC4626(asset, "Mock ERC4626", "MERC4626") {}
 
-    function UNDERLYING_ASSET_ADDRESS() external view returns (address) {
+    function underlyingAssetAddress() external view returns (address) {
         return address(asset);
     }
 
