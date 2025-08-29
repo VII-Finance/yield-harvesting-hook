@@ -11,6 +11,8 @@ import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {IVaultWrapper} from "src/interfaces/IVaultWrapper.sol";
 import {ERC4626VaultWrapperFactory} from "src/ERC4626VaultWrapperFactory.sol";
 
+/// @title Yield Harvesting Hook that allows Liquidity Providers to earn lending interest (from ANY lending protocol) on top of swap fees
+/// @author VII Finance
 contract YieldHarvestingHook is BaseHook {
     using StateLibrary for IPoolManager;
 

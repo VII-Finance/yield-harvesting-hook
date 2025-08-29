@@ -3,8 +3,8 @@ pragma solidity ^0.8.26;
 
 import {Test, console} from "forge-std/Test.sol";
 import {ERC4626VaultWrapperFactory} from "src/ERC4626VaultWrapperFactory.sol";
-import {BaseVaultWrapper, ERC4626VaultWrapper} from "src/VaultWrappers/ERC4626VaultWrapper.sol";
-import {AaveWrapper} from "src/VaultWrappers/AaveWrapper.sol";
+import {BaseVaultWrapper, ERC4626VaultWrapper} from "src/vaultWrappers/ERC4626VaultWrapper.sol";
+import {AaveWrapper} from "src/vaultWrappers/AaveWrapper.sol";
 import {IERC4626} from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
@@ -372,6 +372,23 @@ contract ERC4626VaultWrapperFactoryTest is Test {
         assertEq(predictedKey.fee, actualKey.fee);
         assertEq(predictedKey.tickSpacing, actualKey.tickSpacing);
         assertEq(address(predictedKey.hooks), address(actualKey.hooks));
+    }
+
+    function testCreatePoolsWithVaultsShouldFail() public {
+        factory.createERC4626VaultPool(
+            IERC4626(address(vaultA)), IERC4626(address(vaultB)), FEE, TICK_SPACING, SQRT_PRICE_X96
+        );
+
+        //we swap vault addresses this time but it should still fail due collision
+        vm.expectRevert(LibClone.DeploymentFailed.selector);
+        factory.createERC4626VaultPool(
+            IERC4626(address(vaultB)), IERC4626(address(vaultA)), FEE, TICK_SPACING, SQRT_PRICE_X96
+        );
+
+        factory.createAavePool(address(aTokenA), address(aTokenB), FEE, TICK_SPACING, SQRT_PRICE_X96);
+
+        vm.expectRevert(LibClone.DeploymentFailed.selector);
+        factory.createAavePool(address(aTokenB), address(aTokenA), FEE, TICK_SPACING, SQRT_PRICE_X96);
     }
 
     function _generateSalt(address token0, address token1, uint24 fee, int24 tickSpacing)

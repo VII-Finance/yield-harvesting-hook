@@ -2,10 +2,10 @@
 pragma solidity ^0.8.26;
 
 import {ERC4626VaultWrapperTest} from "test/ERC4626VaultWrapper.t.sol";
-import {AaveWrapper} from "src/VaultWrappers/AaveWrapper.sol";
+import {AaveWrapper} from "src/vaultWrappers/AaveWrapper.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {LibClone} from "lib/solady/src/utils/LibClone.sol";
-import {ERC4626VaultWrapper} from "src/VaultWrappers/ERC4626VaultWrapper.sol";
+import {ERC4626VaultWrapper} from "src/vaultWrappers/ERC4626VaultWrapper.sol";
 
 //It tests ERC4626ness of AaveWrapper
 //It's simple, just returns 1:1 every time

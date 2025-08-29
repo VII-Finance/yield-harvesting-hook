@@ -18,16 +18,18 @@ import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {Fuzzers} from "lib/v4-periphery/lib/v4-core/src/test/Fuzzers.sol";
 import {CustomRevert} from "lib/v4-periphery/lib/v4-core/src/libraries/CustomRevert.sol";
 import {HookMiner} from "lib/v4-periphery/src/utils/HookMiner.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 
 import {YieldHarvestingHook} from "src/YieldHarvestingHook.sol";
 import {ERC4626VaultWrapperFactory} from "src/ERC4626VaultWrapperFactory.sol";
-import {ERC4626VaultWrapper} from "src/VaultWrappers/ERC4626VaultWrapper.sol";
-import {BaseVaultWrapper} from "src/VaultWrappers/Base/BaseVaultWrapper.sol";
+import {ERC4626VaultWrapper} from "src/vaultWrappers/ERC4626VaultWrapper.sol";
+import {BaseVaultWrapper} from "src/vaultWrappers/base/BaseVaultWrapper.sol";
 import {MockERC4626} from "test/utils/MockERC4626.sol";
 import {MockERC20} from "test/utils/MockERC20.sol";
 import {FeeMath, PositionConfig} from "test/utils/libraries/FeeMath.sol";
 import {IERC4626} from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import {Constants} from "@uniswap/v4-core/test/utils/Constants.sol";
+import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "forge-std/console.sol";
 
 contract YieldHarvestingHookTest is Fuzzers, Test {
@@ -245,11 +247,15 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
     }
 
     function _deposit(MockERC4626 vault, uint256 amount, address to) internal virtual returns (uint256) {
-        //assume this address has the necessary amount of tokens
-        deal(address(vault.asset()), address(this), amount);
+        if (vault.previewDeposit(amount) > 0) {
+            //assume this address has the necessary amount of tokens
+            deal(address(vault.asset()), address(this), amount);
 
-        vault.asset().approve(address(vault), amount);
-        return vault.deposit(amount, to);
+            vault.asset().approve(address(vault), amount);
+            return vault.deposit(amount, to);
+        } else {
+            return 0;
+        }
     }
 
     function _mintYieldToVaults(uint256 yield0, uint256 yield1) internal virtual returns (uint256, uint256) {
@@ -266,6 +272,57 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         }
 
         return (yield0, yield1);
+    }
+
+    function test_yieldAndHarvestBeforeRemoveLiquidity(uint256 yield0, uint256 yield1, bool isAaveWrapper) public {
+        setUpVaults(isAaveWrapper);
+
+        uint256 underlyingVaultShares0 = _deposit(underlyingVault0, 20_000, address(this));
+        uint256 underlyingVaultShares1 = _deposit(underlyingVault1, 20_000, address(this));
+
+        underlyingVault0.approve(address(vaultWrapper0), underlyingVaultShares0);
+        underlyingVault1.approve(address(vaultWrapper1), underlyingVaultShares1);
+
+        vaultWrapper0.deposit(underlyingVaultShares0, address(this));
+        vaultWrapper1.deposit(underlyingVaultShares1, address(this));
+
+        vaultWrapper0.approve(address(modifyLiquidityRouter), type(uint256).max);
+        vaultWrapper1.approve(address(modifyLiquidityRouter), type(uint256).max);
+
+        ModifyLiquidityParams memory params = ModifyLiquidityParams({
+            tickLower: TickMath.minUsableTick(poolKey.tickSpacing),
+            tickUpper: TickMath.maxUsableTick(poolKey.tickSpacing),
+            liquidityDelta: 1,
+            salt: 0
+        });
+
+        modifyLiquidityRouter.modifyLiquidity(poolKey, params, "");
+
+        (yield0, yield1) = _mintYieldToVaults(yield0, yield1);
+
+        //now we mint some yield to the underlying vaults and again remove 0 wei of liquidity
+        //this should trigger yieldAndHarvestHook
+
+        uint256 vaultWrapper0TotalSupplyBefore = vaultWrapper0.totalSupply();
+        uint256 vaultWrapper1TotalSupplyBefore = vaultWrapper1.totalSupply();
+
+        params.liquidityDelta = 0;
+
+        modifyLiquidityRouter.modifyLiquidity(poolKey, params, "");
+
+        //make sure totalSupply of vault wrappers have increased by yield
+        assertApproxEqAbs(
+            vaultWrapper0.totalSupply() - vaultWrapper0TotalSupplyBefore,
+            yield0,
+            1,
+            "VaultWrapper0 totalSupply should increase by yield0"
+        );
+        assertApproxEqAbs(
+            vaultWrapper1.totalSupply() - vaultWrapper1TotalSupplyBefore,
+            yield1,
+            1,
+            "VaultWrapper1 totalSupply should increase by yield1"
+        );
     }
 
     function test_yieldAndHarvestBeforeSwap(
@@ -302,7 +359,25 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
         vaultWrapper0.approve(address(swapRouter), type(uint256).max);
         vaultWrapper1.approve(address(swapRouter), type(uint256).max);
+
+        uint256 vaultWrapper0TotalSupplyBefore = vaultWrapper0.totalSupply();
+        uint256 vaultWrapper1TotalSupplyBefore = vaultWrapper1.totalSupply();
+
         swapRouter.swap(poolKey, swapParams, PoolSwapTest.TestSettings({takeClaims: true, settleUsingBurn: false}), "");
+
+        //make sure totalSupply of vault wrappers have increased by yield
+        assertApproxEqAbs(
+            vaultWrapper0.totalSupply() - vaultWrapper0TotalSupplyBefore,
+            yield0,
+            1,
+            "VaultWrapper0 totalSupply should increase by yield0"
+        );
+        assertApproxEqAbs(
+            vaultWrapper1.totalSupply() - vaultWrapper1TotalSupplyBefore,
+            yield1,
+            1,
+            "VaultWrapper1 totalSupply should increase by yield1"
+        );
 
         //make sure balance has increase by yield0 and yield1
         assertApproxEqAbs(
@@ -441,8 +516,17 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
         mixedVaultWrapper.approve(address(swapRouter), type(uint256).max);
         rawAsset.approve(address(swapRouter), type(uint256).max);
+
+        uint256 mixedVaultAssetTotalSupplyBefore = mixedVaultWrapper.totalSupply();
         swapRouter.swap(
             mixedPoolKey, swapParams, PoolSwapTest.TestSettings({takeClaims: true, settleUsingBurn: false}), ""
+        );
+
+        assertApproxEqAbs(
+            mixedVaultWrapper.totalSupply() - mixedVaultAssetTotalSupplyBefore,
+            vaultYield,
+            1,
+            "MixedVaultWrapper totalSupply should increase by vault yield"
         );
 
         // Check that yield was harvested for the vault wrapper currency only
