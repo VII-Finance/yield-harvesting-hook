@@ -16,7 +16,6 @@ import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
-import {BaseAssetToVaultWrapperHelper} from "src/periphery/Base/BaseAssetToVaultWrapperHelper.sol";
 import {IHookEvents} from "src/interfaces/IHookEvents.sol";
 import {IPositionManager} from "lib/v4-periphery/src/interfaces/IPositionManager.sol";
 import {LiquidityHelper} from "src/periphery/LiquidityHelper.sol";
@@ -36,8 +35,7 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, LiquidityHelper, IHookEvent
     constructor(address _evc, IPoolManager poolManager, IPositionManager _positionManager, IHooks _yieldHarvestingHook)
         LiquidityHelper(_evc, _positionManager, _yieldHarvestingHook)
         BaseHook(poolManager)
-    {
-    }
+    {}
 
     function _beforeSwap(address, PoolKey calldata key, SwapParams calldata params, bytes calldata hookData)
         internal
