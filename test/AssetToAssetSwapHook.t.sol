@@ -109,21 +109,24 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
         }
     }
 
-    function test_assetsSwapExactAmountIn() public {
-        uint256 amountIn = 1e18;
+    function test_assetsSwapExactAmountIn(uint256 amountIn, bool zeroForOne) public {
+        amountIn = bound(amountIn, 10, 1e18);
 
-        deal(Currency.unwrap(assetsPoolKey.currency0), address(this), amountIn);
-        _currencyToIERC20(assetsPoolKey.currency0).approve(address(swapRouter), amountIn);
+        Currency currencyIn = zeroForOne ? assetsPoolKey.currency0 : assetsPoolKey.currency1;
+        Currency currencyOut = zeroForOne ? assetsPoolKey.currency1 : assetsPoolKey.currency0;
+
+        deal(Currency.unwrap(currencyIn), address(this), amountIn);
+        _currencyToIERC20(currencyIn).approve(address(swapRouter), amountIn);
 
         //we assume that prior to the mint, poolManager already has some asset0 that user can take it out of
-        deal(Currency.unwrap(assetsPoolKey.currency0), address(poolManager), amountIn);
+        deal(Currency.unwrap(currencyIn), address(poolManager), amountIn);
 
-        uint256 asset1BalanceBefore = assetsPoolKey.currency1.balanceOf(address(this));
+        uint256 assetBalanceBefore = currencyOut.balanceOf(address(this));
 
         SwapParams memory swapParams = SwapParams({
-            zeroForOne: true,
+            zeroForOne: zeroForOne,
             amountSpecified: -int256(amountIn),
-            sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
+            sqrtPriceLimitX96: zeroForOne ? TickMath.MIN_SQRT_PRICE + 1 : TickMath.MAX_SQRT_PRICE - 1
         });
 
         (IERC4626 associatedVault0, IERC4626 associatedVault1) = sortVaultWrappers(
@@ -140,31 +143,28 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
             abi.encode(associatedVault0, associatedVault1)
         );
 
-        uint256 asset1Out = SafeCast.toUint256(swapDelta.amount1());
-        assertEq(
-            asset1Out,
-            assetsPoolKey.currency1.balanceOf(address(this)) - asset1BalanceBefore,
-            "Incorrect asset1 out amount"
-        );
+        uint256 assetOut = SafeCast.toUint256(zeroForOne ? swapDelta.amount1() : swapDelta.amount0());
+        assertEq(assetOut, currencyOut.balanceOf(address(this)) - assetBalanceBefore, "Incorrect asset out amount");
     }
 
-    function test_assetsSwapExactAmountOut() public {
-        uint256 amountOut = 1e18;
+    function test_assetsSwapExactAmountOut(uint256 amountOut, bool zeroForOne) public {
+        amountOut = bound(amountOut, 10, 1e18);
 
-        // asset1.mint(address(this), 2 * amountOut);
-        deal(Currency.unwrap(assetsPoolKey.currency1), address(this), 2 * amountOut);
-        _currencyToIERC20(assetsPoolKey.currency1).approve(address(swapRouter), 2 * amountOut);
+        Currency currencyIn = zeroForOne ? assetsPoolKey.currency0 : assetsPoolKey.currency1;
+        Currency currencyOut = zeroForOne ? assetsPoolKey.currency1 : assetsPoolKey.currency0;
+
+        deal(Currency.unwrap(currencyIn), address(this), 2 * amountOut);
+        _currencyToIERC20(currencyIn).approve(address(swapRouter), 2 * amountOut);
 
         //we assume that prior to the swap, poolManager already has some asset1 that user can take it out of
-        // asset1.mint(address(poolManager), 2 * amountOut);
-        deal(Currency.unwrap(assetsPoolKey.currency1), address(poolManager), 2 * amountOut);
+        deal(Currency.unwrap(currencyIn), address(poolManager), 2 * amountOut);
 
-        uint256 asset1BalanceBefore = assetsPoolKey.currency1.balanceOf(address(this));
+        uint256 assetBalanceBefore = currencyIn.balanceOf(address(this));
 
         SwapParams memory swapParams = SwapParams({
-            zeroForOne: false,
+            zeroForOne: zeroForOne,
             amountSpecified: int256(amountOut),
-            sqrtPriceLimitX96: TickMath.MAX_SQRT_PRICE - 1
+            sqrtPriceLimitX96: zeroForOne ? TickMath.MIN_SQRT_PRICE + 1 : TickMath.MAX_SQRT_PRICE - 1
         });
 
         (IERC4626 associatedVault0, IERC4626 associatedVault1) =
@@ -177,12 +177,8 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
             abi.encode(address(associatedVault0), address(associatedVault1))
         );
 
-        uint256 asset1In = SafeCast.toUint256(-swapDelta.amount1());
-        assertEq(
-            asset1In,
-            asset1BalanceBefore - assetsPoolKey.currency1.balanceOf(address(this)),
-            "Incorrect asset1 out amount"
-        );
+        uint256 assetIn = SafeCast.toUint256(zeroForOne ? -swapDelta.amount0() : -swapDelta.amount1());
+        assertEq(assetIn, assetBalanceBefore - currencyIn.balanceOf(address(this)), "Incorrect asset out amount");
     }
 
     function testMintAndIncreasePosition(uint128 liquidityToAdd) public {
