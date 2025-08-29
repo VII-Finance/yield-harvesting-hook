@@ -7,8 +7,6 @@ import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IERC4626} from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {IERC721} from "lib/openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
-import {ERC20, ERC4626} from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/ERC4626.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {
     BeforeSwapDelta, BeforeSwapDeltaLibrary, toBeforeSwapDelta
@@ -20,12 +18,7 @@ import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 import {BaseAssetToVaultWrapperHelper} from "src/periphery/Base/BaseAssetToVaultWrapperHelper.sol";
 import {IHookEvents} from "src/interfaces/IHookEvents.sol";
-import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
-import {EVCUtil} from "ethereum-vault-connector//utils/EVCUtil.sol";
 import {IPositionManager} from "lib/v4-periphery/src/interfaces/IPositionManager.sol";
-import {Actions} from "lib/v4-periphery/src/libraries/Actions.sol";
-import {ActionConstants} from "lib/v4-periphery/src/libraries/ActionConstants.sol";
-import {IWETH9} from "lib/v4-periphery/src/interfaces/external/IWETH9.sol";
 import {LiquidityHelper} from "src/periphery/LiquidityHelper.sol";
 
 interface IPositionManagerExtended is IPositionManager {
@@ -44,9 +37,6 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, LiquidityHelper, IHookEvent
         LiquidityHelper(_evc, _positionManager, _yieldHarvestingHook)
         BaseHook(poolManager)
     {
-        yieldHarvestingHook = _yieldHarvestingHook;
-        positionManager = _positionManager;
-        weth = IWETH9(IPositionManagerExtended(address(_positionManager)).WETH9());
     }
 
     function _beforeSwap(address, PoolKey calldata key, SwapParams calldata params, bytes calldata hookData)
