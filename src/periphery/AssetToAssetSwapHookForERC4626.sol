@@ -27,7 +27,8 @@ import {BaseAssetToVaultWrapperHelper} from "src/periphery/base/BaseAssetToVault
 /// @notice This contract enables users to interact with pools created using the yield harvesting hook without needing to manually convert assets to or from vault wrappers.
 /// @dev It automates the conversion between ERC20 assets without any special logic, following the flow described in https://github.com/VII-Finance/yield-harvesting-hook/blob/periphery-contracts/docs/swap_flow.md.
 /// @dev Only vault wrappers with underlying vaults that support the ERC4626 interface are supported; Aave vaults are not supported.
-/// @dev hookData should contain two encoded IERC4626 vault wrappers (for token0 and token1 respectively), or address(0) if no vault wrapper is used for that token.
+/// @dev hookData should contain two encoded IERC4626 vault wrappers (for token0 and token1 respectively), or address(0) if no vault wrapper is used for that token
+/// @dev if hookDat is not provided then default vault wrappers decided by the hook owner will be used.
 contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelper, Ownable, IHookEvents {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
