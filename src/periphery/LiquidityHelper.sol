@@ -21,7 +21,6 @@ interface IPositionManagerExtended is IPositionManager {
 }
 
 ///@dev This doesn't support aave vaults. Only vault wrappers that have underlying vaults that support ERC4626 interface are supported
-///@dev hookData is supposed have two encoded IERC4626 vault wrappers (for token0 and token1 respectively), leave it as address(0) if there is no vault wrapper for that token
 contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;

@@ -30,6 +30,8 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
     address public evc;
     AssetToAssetSwapHookForERC4626 assetToAssetSwapHook;
 
+    address initialOwner = makeAddr("initialOwner");
+
     using StateLibrary for PoolManager;
 
     uint160 constant SWAP_HOOK_PERMISSIONS =
@@ -71,11 +73,12 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
             address(this),
             SWAP_HOOK_PERMISSIONS,
             type(AssetToAssetSwapHookForERC4626).creationCode,
-            abi.encode(evc, poolManager, positionManager, yieldHarvestingHook)
+            abi.encode(evc, poolManager, positionManager, yieldHarvestingHook, initialOwner)
         );
 
-        assetToAssetSwapHook =
-            new AssetToAssetSwapHookForERC4626{salt: salt}(evc, poolManager, positionManager, yieldHarvestingHook);
+        assetToAssetSwapHook = new AssetToAssetSwapHookForERC4626{salt: salt}(
+            evc, poolManager, positionManager, yieldHarvestingHook, initialOwner
+        );
 
         assetsPoolKey = PoolKey({
             currency0: isCurrency0SameAsAsset0 ? Currency.wrap(address(asset0)) : Currency.wrap(address(asset1)),
@@ -107,6 +110,17 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
         } else {
             revert("Vault wrappers do not wrap the correct assets");
         }
+    }
+
+    function test_setDefaultVaultWrappers() public {
+        vm.expectRevert();
+        assetToAssetSwapHook.setDefaultVaultWrappers(assetsPoolKey, IERC4626(address(0)), IERC4626(address(0)));
+
+        (IERC4626 associatedVault0, IERC4626 associatedVault1) =
+            sortVaultWrappers(vaultWrapper0, vaultWrapper1, address(asset0), address(asset1));
+
+        vm.startPrank(initialOwner);
+        assetToAssetSwapHook.setDefaultVaultWrappers(assetsPoolKey, associatedVault0, associatedVault1);
     }
 
     function test_assetsSwapExactAmountIn(uint256 amountIn, bool zeroForOne) public {
@@ -170,11 +184,12 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
         (IERC4626 associatedVault0, IERC4626 associatedVault1) =
             sortVaultWrappers(vaultWrapper0, vaultWrapper1, address(asset0), address(asset1));
 
+        vm.startPrank(initialOwner);
+        assetToAssetSwapHook.setDefaultVaultWrappers(assetsPoolKey, associatedVault0, associatedVault1);
+        vm.stopPrank();
+
         BalanceDelta swapDelta = swapRouter.swap(
-            assetsPoolKey,
-            swapParams,
-            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
-            abi.encode(address(associatedVault0), address(associatedVault1))
+            assetsPoolKey, swapParams, PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}), ""
         );
 
         uint256 assetIn = SafeCast.toUint256(zeroForOne ? -swapDelta.amount0() : -swapDelta.amount1());

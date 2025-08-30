@@ -19,7 +19,9 @@ import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 import {IHookEvents} from "src/interfaces/IHookEvents.sol";
 import {IPositionManager} from "lib/v4-periphery/src/interfaces/IPositionManager.sol";
-import {LiquidityHelper} from "src/periphery/LiquidityHelper.sol";
+import {EVCUtil, LiquidityHelper} from "src/periphery/LiquidityHelper.sol";
+import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Context} from "lib/openzeppelin-contracts/contracts/utils/Context.sol";
 
 interface IPositionManagerExtended is IPositionManager {
     function WETH9() external view returns (address);
@@ -27,16 +29,30 @@ interface IPositionManagerExtended is IPositionManager {
 
 ///@dev This doesn't support aave vaults. Only vault wrappers that have underlying vaults that support ERC4626 interface are supported
 ///@dev hookData is supposed have two encoded IERC4626 vault wrappers (for token0 and token1 respectively), leave it as address(0) if there is no vault wrapper for that token
-contract AssetToAssetSwapHookForERC4626 is BaseHook, LiquidityHelper, IHookEvents {
+contract AssetToAssetSwapHookForERC4626 is BaseHook, LiquidityHelper, Ownable, IHookEvents {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
     using SafeCast for int256;
     using SafeCast for int128;
 
-    constructor(address _evc, IPoolManager poolManager, IPositionManager _positionManager, IHooks _yieldHarvestingHook)
-        LiquidityHelper(_evc, _positionManager, _yieldHarvestingHook)
-        BaseHook(poolManager)
-    {}
+    struct VaultWrappers {
+        IERC4626 vaultWrapperForCurrency0;
+        IERC4626 vaultWrapperForCurrency1;
+    }
+
+    mapping(PoolId poolId => VaultWrappers vaultWrappers) public defaultVaultWrappers;
+
+    event DefaultVaultWrappersSet(
+        bytes32 indexed poolId, address indexed vaultWrappers0, address indexed vaultWrapperForCurrency1
+    );
+
+    constructor(
+        address _evc,
+        IPoolManager poolManager,
+        IPositionManager _positionManager,
+        IHooks _yieldHarvestingHook,
+        address _initialOwner
+    ) LiquidityHelper(_evc, _positionManager, _yieldHarvestingHook) BaseHook(poolManager) Ownable(_initialOwner) {}
 
     function _beforeSwap(address sender, PoolKey calldata key, SwapParams calldata params, bytes calldata hookData)
         internal
@@ -96,19 +112,32 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, LiquidityHelper, IHookEvent
         view
         returns (SwapContext memory context)
     {
-        (IERC4626 vaultWrapper0, IERC4626 vaultWrapper1) = abi.decode(hookData, (IERC4626, IERC4626));
+        IERC4626 vaultWrapperForCurrency0;
+        IERC4626 vaultWrapperForCurrency1;
 
-        IERC4626 underlyingVault0 = _getUnderlyingVault(vaultWrapper0);
-        IERC4626 underlyingVault1 = _getUnderlyingVault(vaultWrapper1);
+        //if vault wrappers to use is not provided than the contract will simply use defaults set by owner
+        if (hookData.length > 0) {
+            (vaultWrapperForCurrency0, vaultWrapperForCurrency1) = abi.decode(hookData, (IERC4626, IERC4626));
+        } else {
+            VaultWrappers memory defaultVaultWrappersSetByOwner = defaultVaultWrappers[key.toId()];
+            (vaultWrapperForCurrency0, vaultWrapperForCurrency1) = (
+                defaultVaultWrappersSetByOwner.vaultWrapperForCurrency0,
+                defaultVaultWrappersSetByOwner.vaultWrapperForCurrency1
+            );
+        }
 
-        try vaultWrapper1.asset() returns (address asset1) {
+        IERC4626 underlyingVault0 = _getUnderlyingVault(vaultWrapperForCurrency0);
+        IERC4626 underlyingVault1 = _getUnderlyingVault(vaultWrapperForCurrency1);
+
+        try vaultWrapperForCurrency1.asset() returns (address asset1) {
             underlyingVault1 = IERC4626(asset1);
         } catch {
             underlyingVault1 = IERC4626(address(0));
         }
 
-        (context.vaultWrapperIn, context.vaultWrapperOut) =
-            params.zeroForOne ? (vaultWrapper0, vaultWrapper1) : (vaultWrapper1, vaultWrapper0);
+        (context.vaultWrapperIn, context.vaultWrapperOut) = params.zeroForOne
+            ? (vaultWrapperForCurrency0, vaultWrapperForCurrency1)
+            : (vaultWrapperForCurrency1, vaultWrapperForCurrency0);
 
         (context.underlyingVaultIn, context.underlyingVaultOut) =
             params.zeroForOne ? (underlyingVault0, underlyingVault1) : (underlyingVault1, underlyingVault0);
@@ -119,12 +148,12 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, LiquidityHelper, IHookEvent
             params.zeroForOne ? IERC20(Currency.unwrap(key.currency1)) : IERC20(Currency.unwrap(key.currency0));
 
         context.vaultWrapperPoolKey = PoolKey({
-            currency0: address(vaultWrapper0) < address(vaultWrapper1)
-                ? Currency.wrap(address(vaultWrapper0))
-                : Currency.wrap(address(vaultWrapper1)),
-            currency1: address(vaultWrapper0) < address(vaultWrapper1)
-                ? Currency.wrap(address(vaultWrapper1))
-                : Currency.wrap(address(vaultWrapper0)),
+            currency0: address(vaultWrapperForCurrency0) < address(vaultWrapperForCurrency1)
+                ? Currency.wrap(address(vaultWrapperForCurrency0))
+                : Currency.wrap(address(vaultWrapperForCurrency1)),
+            currency1: address(vaultWrapperForCurrency0) < address(vaultWrapperForCurrency1)
+                ? Currency.wrap(address(vaultWrapperForCurrency1))
+                : Currency.wrap(address(vaultWrapperForCurrency0)),
             fee: key.fee,
             tickSpacing: key.tickSpacing,
             hooks: yieldHarvestingHook
@@ -313,6 +342,28 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, LiquidityHelper, IHookEvent
             SafeERC20.safeTransfer(asset, address(poolManager), amountOut);
         }
         poolManager.settle();
+    }
+
+    function _msgSender() internal view override(Context, EVCUtil) returns (address) {
+        return EVCUtil._msgSender();
+    }
+
+    function setDefaultVaultWrappers(
+        PoolKey memory assetsPoolKey,
+        IERC4626 vaultWrapperForCurrency0,
+        IERC4626 vaultWrapperForCurrency1
+    ) external onlyOwner {
+        //we expect owner to make sure they sanity check the addresses
+        //address(0) if we expect currency itself to be used without any vaultWrappers
+        PoolId assetsPoolId = assetsPoolKey.toId();
+        defaultVaultWrappers[assetsPoolId] = VaultWrappers({
+            vaultWrapperForCurrency0: vaultWrapperForCurrency0,
+            vaultWrapperForCurrency1: vaultWrapperForCurrency1
+        });
+
+        emit DefaultVaultWrappersSet(
+            PoolId.unwrap(assetsPoolId), address(vaultWrapperForCurrency0), address(vaultWrapperForCurrency1)
+        );
     }
 
     function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
