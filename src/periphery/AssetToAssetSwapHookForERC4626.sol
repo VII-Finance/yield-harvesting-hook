@@ -8,6 +8,7 @@ import {IERC4626} from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {
     BeforeSwapDelta, BeforeSwapDeltaLibrary, toBeforeSwapDelta
 } from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
@@ -37,7 +38,7 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, LiquidityHelper, IHookEvent
         BaseHook(poolManager)
     {}
 
-    function _beforeSwap(address, PoolKey calldata key, SwapParams calldata params, bytes calldata hookData)
+    function _beforeSwap(address sender, PoolKey calldata key, SwapParams calldata params, bytes calldata hookData)
         internal
         override
         returns (bytes4, BeforeSwapDelta, uint24)
@@ -51,13 +52,29 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, LiquidityHelper, IHookEvent
 
         if (isExactInput) {
             (amountIn, amountOut) = _handleExactInputSwap(context, params);
+
+            emit HookSwap(
+                PoolId.unwrap(key.toId()),
+                sender,
+                params.zeroForOne ? amountIn.toInt256().toInt128() : -amountOut.toInt256().toInt128(),
+                params.zeroForOne ? -amountOut.toInt256().toInt128() : amountIn.toInt256().toInt128(),
+                0,
+                0
+            );
         } else {
             (amountIn, amountOut) = _handleExactOutputSwap(context, params);
+
+            emit HookSwap(
+                PoolId.unwrap(key.toId()),
+                sender,
+                params.zeroForOne ? -amountIn.toInt256().toInt128() : amountOut.toInt256().toInt128(),
+                params.zeroForOne ? amountOut.toInt256().toInt128() : -amountIn.toInt256().toInt128(),
+                0,
+                0
+            );
         }
 
         BeforeSwapDelta returnDelta = _calculateReturnDelta(isExactInput, amountIn, amountOut);
-
-        //TODO: emit HookSwap event
 
         return (BaseHook.beforeSwap.selector, returnDelta, 0);
     }
