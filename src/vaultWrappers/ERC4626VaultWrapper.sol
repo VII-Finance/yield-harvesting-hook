@@ -15,7 +15,7 @@ import {BaseVaultWrapper} from "src/vaultWrappers/base/BaseVaultWrapper.sol";
  *      No harvest operations will occur until the vault regains solvency.
  */
 contract ERC4626VaultWrapper is BaseVaultWrapper {
-    constructor() BaseVaultWrapper() {}
+    constructor() {}
 
     function previewMint(uint256 shares) public view override returns (uint256) {
         return _underlyingVault().previewWithdraw(shares);
