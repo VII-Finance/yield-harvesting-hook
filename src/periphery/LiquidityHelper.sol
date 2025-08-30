@@ -47,15 +47,6 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
         _;
     }
 
-    function _getUnderlyingVault(IERC4626 vaultWrapper) internal view returns (IERC4626 underlyingVault) {
-        try vaultWrapper.asset() returns (address asset) {
-            underlyingVault = IERC4626(asset);
-        } catch {
-            underlyingVault = IERC4626(address(0));
-        }
-        return underlyingVault;
-    }
-
     function _pullAndConvertAssets(
         PoolKey memory poolKey,
         uint128 amount0Max,

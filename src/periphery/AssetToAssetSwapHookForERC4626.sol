@@ -22,16 +22,13 @@ import {IPositionManager} from "lib/v4-periphery/src/interfaces/IPositionManager
 import {EVCUtil, LiquidityHelper} from "src/periphery/LiquidityHelper.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Context} from "lib/openzeppelin-contracts/contracts/utils/Context.sol";
-
-interface IPositionManagerExtended is IPositionManager {
-    function WETH9() external view returns (address);
-}
+import {BaseAssetToVaultWrapperHelper} from "src/periphery/base/BaseAssetToVaultWrapperHelper.sol";
 
 /// @notice This contract enables users to interact with pools created using the yield harvesting hook without needing to manually convert assets to or from vault wrappers.
 /// @dev It automates the conversion between ERC20 assets without any special logic, following the flow described in https://github.com/VII-Finance/yield-harvesting-hook/blob/periphery-contracts/docs/swap_flow.md.
 /// @dev Only vault wrappers with underlying vaults that support the ERC4626 interface are supported; Aave vaults are not supported.
 /// @dev hookData should contain two encoded IERC4626 vault wrappers (for token0 and token1 respectively), or address(0) if no vault wrapper is used for that token.
-contract AssetToAssetSwapHookForERC4626 is BaseHook, LiquidityHelper, Ownable, IHookEvents {
+contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelper, Ownable, IHookEvents {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
     using SafeCast for int256;
@@ -42,19 +39,21 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, LiquidityHelper, Ownable, I
         IERC4626 vaultWrapperForCurrency1;
     }
 
+    /// @notice The hooks contract for vault wrapper pools
+    IHooks public immutable yieldHarvestingHook;
+
     mapping(PoolId poolId => VaultWrappers vaultWrappers) public defaultVaultWrappers;
 
     event DefaultVaultWrappersSet(
         bytes32 indexed poolId, address indexed vaultWrappers0, address indexed vaultWrapperForCurrency1
     );
 
-    constructor(
-        address _evc,
-        IPoolManager poolManager,
-        IPositionManager _positionManager,
-        IHooks _yieldHarvestingHook,
-        address _initialOwner
-    ) LiquidityHelper(_evc, _positionManager, _yieldHarvestingHook) BaseHook(poolManager) Ownable(_initialOwner) {}
+    constructor(IPoolManager _poolManager, IHooks _yieldHarvestingHook, address _initialOwner)
+        BaseHook(_poolManager)
+        Ownable(_initialOwner)
+    {
+        yieldHarvestingHook = _yieldHarvestingHook;
+    }
 
     function _beforeSwap(address sender, PoolKey calldata key, SwapParams calldata params, bytes calldata hookData)
         internal
@@ -344,10 +343,6 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, LiquidityHelper, Ownable, I
             SafeERC20.safeTransfer(asset, address(poolManager), amountOut);
         }
         poolManager.settle();
-    }
-
-    function _msgSender() internal view override(Context, EVCUtil) returns (address) {
-        return EVCUtil._msgSender();
     }
 
     function setDefaultVaultWrappers(

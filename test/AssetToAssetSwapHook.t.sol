@@ -23,12 +23,14 @@ import {
 } from "lib/v4-periphery/src/PositionManager.sol";
 import {WETH} from "lib/solady/src/tokens/WETH.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {LiquidityHelper} from "src/periphery/LiquidityHelper.sol";
 
 contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
     PositionManager public positionManager;
     address public weth;
     address public evc;
     AssetToAssetSwapHookForERC4626 assetToAssetSwapHook;
+    LiquidityHelper liquidityHelper;
 
     address initialOwner = makeAddr("initialOwner");
 
@@ -73,12 +75,13 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
             address(this),
             SWAP_HOOK_PERMISSIONS,
             type(AssetToAssetSwapHookForERC4626).creationCode,
-            abi.encode(evc, poolManager, positionManager, yieldHarvestingHook, initialOwner)
+            abi.encode(poolManager, yieldHarvestingHook, initialOwner)
         );
 
-        assetToAssetSwapHook = new AssetToAssetSwapHookForERC4626{salt: salt}(
-            evc, poolManager, positionManager, yieldHarvestingHook, initialOwner
-        );
+        assetToAssetSwapHook =
+            new AssetToAssetSwapHookForERC4626{salt: salt}(poolManager, yieldHarvestingHook, initialOwner);
+
+        liquidityHelper = new LiquidityHelper(evc, positionManager, yieldHarvestingHook);
 
         assetsPoolKey = PoolKey({
             currency0: isCurrency0SameAsAsset0 ? Currency.wrap(address(asset0)) : Currency.wrap(address(asset1)),
@@ -205,13 +208,13 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
         deal(address(asset0), address(this), liquidityToAdd);
         deal(address(asset1), address(this), liquidityToAdd);
 
-        asset0.approve(address(assetToAssetSwapHook), type(uint256).max);
-        asset1.approve(address(assetToAssetSwapHook), type(uint256).max);
+        asset0.approve(address(liquidityHelper), type(uint256).max);
+        asset1.approve(address(liquidityHelper), type(uint256).max);
 
         poolKey.currency0 = Currency.wrap(address(asset0));
         poolKey.currency1 = Currency.wrap(address(asset1));
 
-        (uint256 tokenId) = assetToAssetSwapHook.mintPosition(
+        (uint256 tokenId) = liquidityHelper.mintPosition(
             poolKey,
             tickLower,
             tickUpper,
@@ -225,9 +228,9 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
         deal(address(asset0), address(this), liquidityToAdd);
         deal(address(asset1), address(this), liquidityToAdd);
 
-        positionManager.approve(address(assetToAssetSwapHook), tokenId);
+        positionManager.approve(address(liquidityHelper), tokenId);
 
-        assetToAssetSwapHook.increaseLiquidity(
+        liquidityHelper.increaseLiquidity(
             poolKey,
             tokenId,
             liquidityToAdd,
@@ -236,7 +239,7 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
             abi.encode(vaultWrapper0, vaultWrapper1)
         );
 
-        assetToAssetSwapHook.decreaseLiquidity(
+        liquidityHelper.decreaseLiquidity(
             poolKey, tokenId, liquidityToAdd, 0, 0, address(this), abi.encode(vaultWrapper0, vaultWrapper1)
         );
     }
