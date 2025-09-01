@@ -59,7 +59,7 @@ abstract contract BaseVaultWrapper is ERC4626, IVaultWrapper {
         return string(abi.encodePacked("VII-", ERC20(getUnderlyingVault()).symbol()));
     }
 
-    function decimals() public view override returns (uint8) {
+    function decimals() public view virtual override returns (uint8) {
         return IERC20Metadata(getUnderlyingVault()).decimals();
     }
 

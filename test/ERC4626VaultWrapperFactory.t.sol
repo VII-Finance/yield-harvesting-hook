@@ -17,6 +17,8 @@ import {YieldHarvestingHook} from "src/YieldHarvestingHook.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {LibClone} from "lib/solady/src/utils/LibClone.sol";
 import {HookMiner} from "lib/v4-periphery/src/utils/HookMiner.sol";
+import {MockERC20} from "test/utils/MockERC20.sol";
+import {MockERC4626} from "test/utils/MockERC4626.sol";
 
 contract MockAToken {
     function UNDERLYING_ASSET_ADDRESS() external pure returns (address) {
@@ -32,24 +34,6 @@ contract MockAToken {
     }
 }
 
-contract MockERC4626 {
-    function asset() external pure returns (address) {
-        return address(0);
-    }
-
-    function name() external pure returns (string memory) {
-        return "Mock ERC4626";
-    }
-
-    function symbol() external pure returns (string memory) {
-        return "mERC4626";
-    }
-
-    function decimals() external pure returns (uint8) {
-        return 18;
-    }
-}
-
 contract ERC4626VaultWrapperFactoryTest is Test {
     using StateLibrary for PoolManager;
 
@@ -61,8 +45,8 @@ contract ERC4626VaultWrapperFactoryTest is Test {
     YieldHarvestingHook yieldHarvestingHook;
     address factoryOwner = makeAddr("factoryOwner");
 
-    address tokenA;
-    address tokenB;
+    MockERC20 tokenA;
+    MockERC20 tokenB;
     MockERC4626 vaultA;
     MockERC4626 vaultB;
     MockAToken aTokenA;
@@ -92,10 +76,10 @@ contract ERC4626VaultWrapperFactoryTest is Test {
 
         yieldHarvestingHook = new YieldHarvestingHook{salt: salt}(factoryOwner, poolManager);
 
-        tokenA = makeAddr("tokenA");
-        tokenB = makeAddr("tokenB");
-        vaultA = new MockERC4626();
-        vaultB = new MockERC4626();
+        tokenA = new MockERC20();
+        tokenB = new MockERC20();
+        vaultA = new MockERC4626(tokenA);
+        vaultB = new MockERC4626(tokenB);
 
         aTokenA = new MockAToken();
         aTokenB = new MockAToken();
@@ -126,8 +110,8 @@ contract ERC4626VaultWrapperFactoryTest is Test {
 
         assertEq(wrapperA.asset(), address(vaultA));
         assertEq(wrapperB.asset(), address(vaultB));
-        assertEq(wrapperA.decimals(), vaultA.decimals());
-        assertEq(wrapperB.decimals(), vaultB.decimals());
+        assertEq(wrapperA.decimals(), MockERC20(address(vaultA.asset())).decimals());
+        assertEq(wrapperB.decimals(), MockERC20(address(vaultB.asset())).decimals());
 
         PoolKey memory key = _buildPoolKey(address(wrapperA), address(wrapperB));
         assertTrue(isPoolInitialized(key), "Pool should be initialized");
@@ -141,8 +125,8 @@ contract ERC4626VaultWrapperFactoryTest is Test {
         assertTrue(address(wrapper) != address(0));
         assertEq(wrapper.asset(), address(vaultA));
         assertEq(wrapper.name(), "VII Finance Wrapped Mock ERC4626");
-        assertEq(wrapper.symbol(), "VII-mERC4626");
-        assertEq(wrapper.decimals(), vaultA.decimals());
+        assertEq(wrapper.symbol(), "VII-MERC4626");
+        assertEq(wrapper.decimals(), MockERC20(address(vaultA.asset())).decimals());
 
         PoolKey memory key = _buildPoolKey(address(wrapper), address(tokenA));
         assertTrue(isPoolInitialized(key), "Pool should be initialized");
