@@ -2,7 +2,6 @@
 pragma solidity ^0.8.26;
 
 import {Math} from "lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
-import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {BaseVaultWrapper} from "src/vaultWrappers/base/BaseVaultWrapper.sol";
 
 /**
