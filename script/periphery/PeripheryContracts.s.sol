@@ -21,7 +21,7 @@ contract PeripheryContractsScript is Script {
 
         address evc = 0x2A1176964F5D7caE5406B627Bf6166664FE83c60;
         IPositionManager positionManager = IPositionManager(0x4529A01c7A0410167c5740C487A8DE60232617bf);
-        YieldHarvestingHook yieldHarvestingHook = YieldHarvestingHook(address(0));
+        YieldHarvestingHook yieldHarvestingHook = YieldHarvestingHook(0x777ef319C338C6ffE32A2283F603db603E8F2A80);
 
         // Deploy AssetToAssetSwapHookForERC4626
         (, bytes32 assetToAssetSalt) = HookMiner.find(
