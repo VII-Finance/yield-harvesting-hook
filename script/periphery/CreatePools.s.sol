@@ -17,7 +17,7 @@ import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {AssetToAssetSwapHookForERC4626} from "src/periphery/AssetToAssetSwapHookForERC4626.sol";
-import {LiquidityHelper} from "src/periphery/LiquidityHelper.sol";  
+import {LiquidityHelper} from "src/periphery/LiquidityHelper.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -26,15 +26,15 @@ contract CreatePoolsScript is Script {
     using SafeERC20 for IERC20;
 
     YieldHarvestingHook yieldHarvestingHook = YieldHarvestingHook(0x777ef319C338C6ffE32A2283F603db603E8F2A80);
-        AssetToAssetSwapHookForERC4626 assetToAssetSwapHook =
-            AssetToAssetSwapHookForERC4626(0x01cc8dC6c3f7f03e845B1F4d491Bdec975434088);
-        LiquidityHelper liquidityHelper = LiquidityHelper(0x920E6cF9EbbfC5bCB2900A4998BD7a7BAa67a943);
+    AssetToAssetSwapHookForERC4626 assetToAssetSwapHook =
+        AssetToAssetSwapHookForERC4626(0x01cc8dC6c3f7f03e845B1F4d491Bdec975434088);
+    LiquidityHelper liquidityHelper = LiquidityHelper(0x920E6cF9EbbfC5bCB2900A4998BD7a7BAa67a943);
 
     function _currencyToIERC20(Currency currency) internal pure returns (IERC20) {
         return IERC20(Currency.unwrap(currency));
     }
 
-    function run() external {        
+    function run() external {
         ERC4626VaultWrapperFactory erc4626VaultWrapperFactory =
             ERC4626VaultWrapperFactory(yieldHarvestingHook.erc4626VaultWrapperFactory());
 
@@ -92,9 +92,11 @@ contract CreatePoolsScript is Script {
 
         poolManager.initialize(referenceAssetsPoolKey, TickMath.getSqrtPriceAtTick(0));
 
-        addLiquidity(5 * 1e6, 5 * 1e6, address(vaultWrapper0), address(vaultWrapper1), referencePoolTick, referenceAssetsPoolKey);
+        addLiquidity(
+            5 * 1e6, 5 * 1e6, address(vaultWrapper0), address(vaultWrapper1), referencePoolTick, referenceAssetsPoolKey
+        );
 
-        vm.stopBroadcast(); 
+        vm.stopBroadcast();
     }
 
     function addLiquidity(
@@ -104,15 +106,23 @@ contract CreatePoolsScript is Script {
         address vaultWrapper1,
         int24 referencePoolTick,
         PoolKey memory referenceAssetsPoolKey
-    ) public{
-        
-        if (_currencyToIERC20(referenceAssetsPoolKey.currency0).allowance(msg.sender, address(liquidityHelper)) < currency0AmountToAdd) {
-            _currencyToIERC20(referenceAssetsPoolKey.currency0).forceApprove(address(liquidityHelper), type(uint256).max);
+    ) public {
+        if (
+            _currencyToIERC20(referenceAssetsPoolKey.currency0).allowance(msg.sender, address(liquidityHelper))
+                < currency0AmountToAdd
+        ) {
+            _currencyToIERC20(referenceAssetsPoolKey.currency0).forceApprove(
+                address(liquidityHelper), type(uint256).max
+            );
         }
-        if (_currencyToIERC20(referenceAssetsPoolKey.currency1).allowance(msg.sender, address(liquidityHelper)) < currency1AmountToAdd) {
-            _currencyToIERC20(referenceAssetsPoolKey.currency1).forceApprove(address(liquidityHelper), type(uint256).max);
+        if (
+            _currencyToIERC20(referenceAssetsPoolKey.currency1).allowance(msg.sender, address(liquidityHelper))
+                < currency1AmountToAdd
+        ) {
+            _currencyToIERC20(referenceAssetsPoolKey.currency1).forceApprove(
+                address(liquidityHelper), type(uint256).max
+            );
         }
-
 
         liquidityHelper.mintPosition(
             referenceAssetsPoolKey,
