@@ -43,7 +43,7 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
         _unlimitedAmount = false;
     }
 
-    function setUpVault(Init memory init) public virtual override {
+    function _setUpVaultWithoutYield(Init memory init) internal {
         // setup initial shares and assets for individual users
         for (uint256 i = 0; i < N; i++) {
             address user = init.user[i];
@@ -81,7 +81,26 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
         //decide the fee by pulling randomness from the first user shares
         uint256 feeDivisor = bound(init.share[0], 14, 100);
         ERC4626VaultWrapper(_vault_).setFeeParameters(feeDivisor, feeReceiver);
+    }
 
+    //burn from insurance fund to make the vault wrapper whole after a loss in the underlying vault
+    function _burnFromInsuranceFund(uint256 loss) internal {
+        uint256 underlyingAssetsToMint = loss + 1;
+        underlyingAsset.mint(insuranceFund, underlyingAssetsToMint);
+
+        vm.startPrank(insuranceFund);
+        underlyingAsset.approve(address(underlyingVault), underlyingAssetsToMint);
+        uint256 underlyingVaultSharesMinted = underlyingVault.deposit(underlyingAssetsToMint, insuranceFund);
+        underlyingVault.approve(_vault_, underlyingVaultSharesMinted);
+        ERC4626VaultWrapper(_vault_).deposit(underlyingVaultSharesMinted, insuranceFund);
+
+        //this must have mint greater or equal shares than the loss amount
+        ERC4626VaultWrapper(_vault_).burn(loss);
+        vm.stopPrank();
+    }
+
+    function setUpVault(Init memory init) public virtual override {
+        _setUpVaultWithoutYield(init);
         // setup initial yield for vault
         setUpYield(init);
     }
@@ -150,18 +169,7 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
                 assertEq(fees, 0, "Fees should be zero in case of a loss");
 
                 //what we expect to happen in this case is that the vault wrapper shares equal to the loss amount should be burned
-
-                uint256 underlyingAssetsToMint = loss + 1;
-                underlyingAsset.mint(insuranceFund, underlyingAssetsToMint);
-
-                vm.startPrank(insuranceFund);
-                underlyingAsset.approve(address(underlyingVault), underlyingAssetsToMint);
-                uint256 underlyingVaultSharesMinted = underlyingVault.deposit(underlyingAssetsToMint, insuranceFund);
-                underlyingVault.approve(_vault_, underlyingVaultSharesMinted);
-                ERC4626VaultWrapper(_vault_).deposit(underlyingVaultSharesMinted, insuranceFund);
-
-                //this must have mint greater or equal shares than the loss amount
-                ERC4626VaultWrapper(_vault_).burn(loss);
+                _burnFromInsuranceFund(loss);
 
                 assertLe(
                     ERC4626VaultWrapper(_vault_).totalSupply(),
@@ -300,5 +308,70 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
 
     function test_RT_withdraw_deposit(Init memory init, uint256 assets) public virtual override checkInvariants {
         super.test_RT_withdraw_deposit(init, assets);
+    }
+
+    function test_bad_debt_socialization(Init memory init) public {
+        _setUpVaultWithoutYield(init);
+
+        //let's simulate bad debt socialization by burning some of the underlying assets in the underlying vault
+        int256 lossLimit = bound(init.yield, 0, type(int256).max);
+
+        uint256 loss = bound(uint256(lossLimit), 0, underlyingVault.totalAssets() - 1);
+
+        try underlyingAsset.burn(address(underlyingVault), loss) {
+            //take a snapshot right now. We will come back to this state after we show that the bad debt socialization has caused the vault wrapper to have less assets than what it owns
+            uint256 snapshot = vm.snapshotState();
+
+            //make all of the users try to withdraw their assets. Last few users will fail to do it
+            bool isRedeemFailingForSomeUsers = false;
+
+            for (uint256 i = 0; i < N; i++) {
+                address user = init.user[i];
+                vm.assume(_isEOA(user));
+                vm.assume(user != address(0));
+                uint256 shares = ERC20(_vault_).balanceOf(user);
+
+                if (shares > 0) {
+                    vm.prank(user);
+                    try ERC4626VaultWrapper(_vault_).redeem(shares, user, user) {
+                        //all good
+                    } catch {
+                        isRedeemFailingForSomeUsers = true;
+                        break;
+                    }
+                }
+            }
+            if (isRedeemFailingForSomeUsers) {
+                //let's revert the state and do it right this time by having the insurance fund come in and burn the shares to make the vault wrapper whole
+                vm.revertToState(snapshot);
+
+                uint256 underlyingAssetsToMint = loss + 1;
+                underlyingAsset.mint(insuranceFund, underlyingAssetsToMint);
+
+                _burnFromInsuranceFund(loss);
+
+                isRedeemFailingForSomeUsers = false;
+                for (uint256 i = 0; i < N; i++) {
+                    address user = init.user[i];
+                    vm.assume(_isEOA(user));
+                    vm.assume(user != address(0));
+                    uint256 shares = ERC20(_vault_).balanceOf(user);
+
+                    if (shares > 0) {
+                        vm.prank(user);
+                        try ERC4626VaultWrapper(_vault_).redeem(shares, user, user) {
+                            //all good
+                        } catch {
+                            isRedeemFailingForSomeUsers = true;
+                            break;
+                        }
+                    }
+                }
+
+                assertEq(isRedeemFailingForSomeUsers, false, "Redeem should succeed for all users now");
+            }
+        } catch {
+            vm.assume(false);
+        }
     }
 }
