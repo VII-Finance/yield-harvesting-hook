@@ -11,7 +11,7 @@ import {YieldHarvestingHook} from "src/YieldHarvestingHook.sol";
 import {IPositionManager} from "lib/v4-periphery/src/interfaces/IPositionManager.sol";
 
 contract PeripheryContractsScript is Script {
-    uint160 constant HOOK_PERMISSIONS = uint160(Hooks.BEFORE_SWAP_FLAG) | uint160(Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG);
+    uint160 constant HOOK_PERMISSIONS = uint160(Hooks.BEFORE_SWAP_FLAG) | uint160(Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG) | uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG);
 
     address CREATE2_DEPLOYER = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 

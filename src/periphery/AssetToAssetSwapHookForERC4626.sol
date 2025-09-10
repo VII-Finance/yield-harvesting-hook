@@ -368,7 +368,7 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelp
         return Hooks.Permissions({
             beforeInitialize: false,
             afterInitialize: false,
-            beforeAddLiquidity: false,
+            beforeAddLiquidity: true,
             afterAddLiquidity: false,
             beforeRemoveLiquidity: false,
             afterRemoveLiquidity: false,
