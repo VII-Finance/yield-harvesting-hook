@@ -36,8 +36,8 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
 
     using StateLibrary for PoolManager;
 
-    uint160 constant SWAP_HOOK_PERMISSIONS =
-        uint160(Hooks.BEFORE_SWAP_FLAG) | uint160(Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG);
+    uint160 constant SWAP_HOOK_PERMISSIONS = uint160(Hooks.BEFORE_SWAP_FLAG)
+        | uint160(Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG) | uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG);
 
     PoolKey assetsPoolKey;
     PoolKey mixedAssetPoolKey;
