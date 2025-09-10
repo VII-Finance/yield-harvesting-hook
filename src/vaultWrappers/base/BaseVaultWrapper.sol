@@ -59,7 +59,10 @@ abstract contract BaseVaultWrapper is ERC4626, IVaultWrapper {
         return string(abi.encodePacked("VII-", ERC20(getUnderlyingVault()).symbol()));
     }
 
-    function decimals() public view override returns (uint8) {
+    // NOTE: This is valid for Aave wrappers because aToken decimals are always the same as the underlying asset decimals.
+    // For ERC4626 vaults, this is usually NOT true. This method should be overridden in ERC4626VaultWrappers to ensure
+    // the decimals match the underlying asset, not the underlying vault's decimals.
+    function decimals() public view virtual override returns (uint8) {
         return IERC20Metadata(getUnderlyingVault()).decimals();
     }
 

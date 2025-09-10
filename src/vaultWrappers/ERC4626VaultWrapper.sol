@@ -2,9 +2,8 @@
 pragma solidity ^0.8.26;
 
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
-import {Math} from "lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import {IERC4626} from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
+import {IERC20Metadata} from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {BaseVaultWrapper} from "src/vaultWrappers/base/BaseVaultWrapper.sol";
 
@@ -15,7 +14,7 @@ import {BaseVaultWrapper} from "src/vaultWrappers/base/BaseVaultWrapper.sol";
  *      No harvest operations will occur until the vault regains solvency.
  */
 contract ERC4626VaultWrapper is BaseVaultWrapper {
-    constructor() BaseVaultWrapper() {}
+    constructor() {}
 
     function previewMint(uint256 shares) public view override returns (uint256) {
         return _underlyingVault().previewWithdraw(shares);
@@ -52,5 +51,9 @@ contract ERC4626VaultWrapper is BaseVaultWrapper {
     function _getMaxWithdrawableUnderlyingAssets() internal view override returns (uint256) {
         IERC4626 underlyingVault = _underlyingVault();
         return underlyingVault.previewRedeem(underlyingVault.balanceOf(address(this)));
+    }
+
+    function decimals() public view override returns (uint8) {
+        return IERC20Metadata(_underlyingVault().asset()).decimals();
     }
 }
