@@ -28,7 +28,7 @@ import {LiquidityHelper} from "src/periphery/LiquidityHelper.sol";
 import {PoolSwapTest} from "@uniswap/v4-core/src/test/PoolSwapTest.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 
-contract AssetToAssetSwapHookForkTest is Test{
+contract AssetToAssetSwapHookForkTest is Test {
     PositionManager public positionManager;
     address public weth;
     address public evc;
@@ -65,13 +65,13 @@ contract AssetToAssetSwapHookForkTest is Test{
         positionManager = PositionManager(payable(0x4529A01c7A0410167c5740C487A8DE60232617bf));
         yieldHarvestingHook = YieldHarvestingHook(0x777ef319C338C6ffE32A2283F603db603E8F2A80);
 
-        asset0 = IERC20(0x078D782b760474a361dDA0AF3839290b0EF57AD6);// USDC
+        asset0 = IERC20(0x078D782b760474a361dDA0AF3839290b0EF57AD6); // USDC
         asset1 = IERC20(0x9151434b16b9763660705744891fA906F660EcC5); // USDT
 
         vaultWrapper0 = IERC4626(0x9C383Fa23Dd981b361F0495Ba53dDeB91c750064); //VII-EUSDC
         vaultWrapper1 = IERC4626(0x7b793B1388e14F03e19dc562470e7D25B2Ae9b97); //VII-EUSDT
 
-        swapRouter = new PoolSwapTest(poolManager); 
+        swapRouter = new PoolSwapTest(poolManager);
 
         poolKey = PoolKey({
             currency0: _IERC20ToCurrency(asset0),
@@ -102,7 +102,6 @@ contract AssetToAssetSwapHookForkTest is Test{
         });
 
         poolManager.initialize(assetsPoolKey, Constants.SQRT_PRICE_1_1);
-      
     }
 
     function _IERC20ToCurrency(IERC20 token) internal pure returns (Currency) {
@@ -250,7 +249,7 @@ contract AssetToAssetSwapHookForkTest is Test{
             tokenId,
             liquidityToAdd,
             uint128(2 * liquidityToAdd),
-            uint128(2 *liquidityToAdd),
+            uint128(2 * liquidityToAdd),
             abi.encode(vaultWrapper0, vaultWrapper1)
         );
 
