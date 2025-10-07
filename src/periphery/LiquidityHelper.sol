@@ -215,7 +215,7 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
         //this contract will have the tokens after decreasing liquidity, now we need to withdraw from vault wrappers if needed and send to recipient
         if (address(vaultWrapper0) != address(0)) {
             IERC4626 underlyingVault0 = _getUnderlyingVault(vaultWrapper0);
-            _withdraw(
+            _redeem(
                 vaultWrapper0,
                 address(underlyingVault0),
                 address(this),
@@ -229,7 +229,7 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
 
         if (address(vaultWrapper1) != address(0)) {
             IERC4626 underlyingVault1 = _getUnderlyingVault(vaultWrapper1);
-            _withdraw(
+            _redeem(
                 vaultWrapper1,
                 address(underlyingVault1),
                 address(this),
