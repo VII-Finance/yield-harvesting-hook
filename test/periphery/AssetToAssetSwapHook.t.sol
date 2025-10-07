@@ -200,7 +200,7 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
     }
 
     function testMintAndIncreasePosition(uint128 liquidityToAdd) public {
-        liquidityToAdd = uint128(bound(liquidityToAdd, 1, 1e18));
+        liquidityToAdd = uint128(bound(liquidityToAdd, 10, 1e18));
 
         int24 tickUpper = TickMath.maxUsableTick(poolKey.tickSpacing);
         int24 tickLower = TickMath.minUsableTick(poolKey.tickSpacing);

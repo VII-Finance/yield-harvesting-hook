@@ -100,10 +100,10 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelp
 
     //TODO: this needs to complete. Right now the sqrtPriceLimitX96 can only be prices at the ticks and that is not really correctt
     function invertSqrtPriceX96(uint160 x) internal pure returns (uint160 invX) {
-        if(TickMath.MIN_SQRT_PRICE + 1 <= x) {
+        if (TickMath.MIN_SQRT_PRICE + 1 <= x) {
             return TickMath.MAX_SQRT_PRICE - 1;
         }
-        if(TickMath.MAX_SQRT_PRICE - 1 >= x) {
+        if (TickMath.MAX_SQRT_PRICE - 1 >= x) {
             return TickMath.MIN_SQRT_PRICE + 1;
         }
         int24 tick = TickMath.getTickAtSqrtPrice(x);
@@ -145,8 +145,8 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelp
         IERC4626 underlyingVault0 = _getUnderlyingVault(vaultWrapperForCurrency0);
         IERC4626 underlyingVault1 = _getUnderlyingVault(vaultWrapperForCurrency1);
 
-        context.isVaultForCurrency0LessThanVaultForCurrency1 = address(vaultWrapperForCurrency0)
-            < address(vaultWrapperForCurrency1);
+        context.isVaultForCurrency0LessThanVaultForCurrency1 =
+            address(vaultWrapperForCurrency0) < address(vaultWrapperForCurrency1);
 
         try vaultWrapperForCurrency1.asset() returns (address asset1) {
             underlyingVault1 = IERC4626(asset1);
@@ -196,8 +196,10 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelp
         // Swap vault wrapper shares
         uint256 vaultWrapperOutAmount = _performVaultWrapperSwap(
             context.vaultWrapperPoolKey,
-            context.isVaultForCurrency0LessThanVaultForCurrency1? params.zeroForOne : !params.zeroForOne,
-            context.isVaultForCurrency0LessThanVaultForCurrency1 ? params.sqrtPriceLimitX96 : invertSqrtPriceX96(params.sqrtPriceLimitX96),
+            context.isVaultForCurrency0LessThanVaultForCurrency1 ? params.zeroForOne : !params.zeroForOne,
+            context.isVaultForCurrency0LessThanVaultForCurrency1
+                ? params.sqrtPriceLimitX96
+                : invertSqrtPriceX96(params.sqrtPriceLimitX96),
             vaultWrapperSharesMinted,
             true // isExactInput
         );
@@ -225,8 +227,10 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelp
         // Perform swap to get required vault wrapper shares
         uint256 vaultWrapperInAmount = _performVaultWrapperSwap(
             context.vaultWrapperPoolKey,
-            context.isVaultForCurrency0LessThanVaultForCurrency1? params.zeroForOne : !params.zeroForOne,
-            context.isVaultForCurrency0LessThanVaultForCurrency1 ? params.sqrtPriceLimitX96 : invertSqrtPriceX96(params.sqrtPriceLimitX96),
+            context.isVaultForCurrency0LessThanVaultForCurrency1 ? params.zeroForOne : !params.zeroForOne,
+            context.isVaultForCurrency0LessThanVaultForCurrency1
+                ? params.sqrtPriceLimitX96
+                : invertSqrtPriceX96(params.sqrtPriceLimitX96),
             vaultWrapperSharesNeeded,
             false // isExactInput = false
         );
@@ -293,17 +297,15 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelp
         SwapParams memory swapParams = SwapParams({
             zeroForOne: zeroForOne,
             amountSpecified: isExactInput ? -amount.toInt256() : amount.toInt256(),
-            sqrtPriceLimitX96: sqrtPriceLimitX96       
+            sqrtPriceLimitX96: sqrtPriceLimitX96
         });
 
         BalanceDelta swapDelta = poolManager.swap(poolKey, swapParams, "");
 
         if (isExactInput) {
-            outputAmount =
-                zeroForOne ? (swapDelta.amount1()).toUint256() : (swapDelta.amount0()).toUint256();
+            outputAmount = zeroForOne ? (swapDelta.amount1()).toUint256() : (swapDelta.amount0()).toUint256();
         } else {
-            outputAmount =
-                zeroForOne ? (-swapDelta.amount0()).toUint256() : (-swapDelta.amount1()).toUint256();
+            outputAmount = zeroForOne ? (-swapDelta.amount0()).toUint256() : (-swapDelta.amount1()).toUint256();
         }
     }
 
