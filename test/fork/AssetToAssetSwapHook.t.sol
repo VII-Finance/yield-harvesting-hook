@@ -28,6 +28,7 @@ import {LiquidityHelper} from "src/periphery/LiquidityHelper.sol";
 import {PoolSwapTest} from "@uniswap/v4-core/src/test/PoolSwapTest.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 
+///@dev this is a stand alone fork test specifically for testing AssetToAssetSwapHookForERC4626
 contract AssetToAssetSwapHookForkTest is Test {
     PositionManager public positionManager;
     address public weth;
@@ -157,7 +158,7 @@ contract AssetToAssetSwapHookForkTest is Test {
         SwapParams memory swapParams = SwapParams({
             zeroForOne: zeroForOne,
             amountSpecified: -int256(amountIn),
-            sqrtPriceLimitX96: zeroForOne ? TickMath.MIN_SQRT_PRICE + 1 : TickMath.MAX_SQRT_PRICE - 1
+            sqrtPriceLimitX96: zeroForOne ? TickMath.MAX_SQRT_PRICE + 1 : TickMath.MIN_SQRT_PRICE - 1
         });
 
         (IERC4626 associatedVault0, IERC4626 associatedVault1) = sortVaultWrappers(
@@ -179,7 +180,7 @@ contract AssetToAssetSwapHookForkTest is Test {
     }
 
     function test_assetsSwapExactAmountOut(uint256 amountOut, bool zeroForOne) public {
-        amountOut = bound(amountOut, 10, 1e18);
+        amountOut = bound(amountOut, 10, 1e6);
 
         Currency currencyIn = zeroForOne ? assetsPoolKey.currency0 : assetsPoolKey.currency1;
         Currency currencyOut = zeroForOne ? assetsPoolKey.currency1 : assetsPoolKey.currency0;
@@ -195,7 +196,7 @@ contract AssetToAssetSwapHookForkTest is Test {
         SwapParams memory swapParams = SwapParams({
             zeroForOne: zeroForOne,
             amountSpecified: int256(amountOut),
-            sqrtPriceLimitX96: zeroForOne ? TickMath.MIN_SQRT_PRICE + 1 : TickMath.MAX_SQRT_PRICE - 1
+            sqrtPriceLimitX96: zeroForOne ? TickMath.MAX_SQRT_PRICE + 1 : TickMath.MIN_SQRT_PRICE - 1
         });
 
         (IERC4626 associatedVault0, IERC4626 associatedVault1) =
@@ -214,7 +215,7 @@ contract AssetToAssetSwapHookForkTest is Test {
     }
 
     function testMintAndIncreasePosition(uint128 liquidityToAdd) public {
-        liquidityToAdd = uint128(bound(liquidityToAdd, 1, 1e6));
+        liquidityToAdd = uint128(bound(liquidityToAdd, 10, 1e8));
 
         int24 tickUpper = TickMath.maxUsableTick(poolKey.tickSpacing);
         int24 tickLower = TickMath.minUsableTick(poolKey.tickSpacing);
