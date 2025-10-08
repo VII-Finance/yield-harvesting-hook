@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.13;
 
-import {YieldHarvestingHookTest} from "test/YieldHarvestingHook.t.sol";
+import {Test} from "forge-std/Test.sol";
+import {YieldHarvestingHook} from "src/YieldHarvestingHook.sol";
 import {AssetToAssetSwapHookForERC4626} from "src/periphery/AssetToAssetSwapHookForERC4626.sol";
 import {HookMiner} from "lib/v4-periphery/src/utils/HookMiner.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
@@ -24,13 +25,19 @@ import {
 import {WETH} from "lib/solady/src/tokens/WETH.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {LiquidityHelper} from "src/periphery/LiquidityHelper.sol";
+import {PoolSwapTest} from "@uniswap/v4-core/src/test/PoolSwapTest.sol";
+import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 
-contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
+///@dev this is a stand alone fork test specifically for testing AssetToAssetSwapHookForERC4626
+contract AssetToAssetSwapHookForkTest is Test {
     PositionManager public positionManager;
     address public weth;
     address public evc;
     AssetToAssetSwapHookForERC4626 assetToAssetSwapHook;
     LiquidityHelper liquidityHelper;
+    YieldHarvestingHook public yieldHarvestingHook;
+    PoolManager public poolManager;
+    PoolSwapTest public swapRouter;
 
     address initialOwner = makeAddr("initialOwner");
 
@@ -39,37 +46,41 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
     uint160 constant SWAP_HOOK_PERMISSIONS = uint160(Hooks.BEFORE_SWAP_FLAG)
         | uint160(Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG) | uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG);
 
+    PoolKey public poolKey;
+
     PoolKey assetsPoolKey;
-    PoolKey mixedAssetPoolKey;
 
-    function setUp() public override {
-        super.setUp();
+    IERC20 public asset0;
+    IERC20 public asset1;
 
-        evc = address(new EthereumVaultConnector());
-        weth = address(new WETH());
-        positionManager = new PositionManager(
-            poolManager, IAllowanceTransfer(address(0)), 0, IPositionDescriptor(address(0)), IWETH9(address(weth))
-        );
+    IERC4626 public vaultWrapper0;
+    IERC4626 public vaultWrapper1;
 
-        setUpVaults(false);
+    function setUp() public {
+        string memory fork_url = vm.envString("UNICHAIN_RPC_URL");
+        vm.createSelectFork(fork_url, 29051161);
 
-        (uint160 sqrtRatioX96,,,) = poolManager.getSlot0(poolKey.toId());
+        evc = address(0x2A1176964F5D7caE5406B627Bf6166664FE83c60);
+        weth = address(0x4200000000000000000000000000000000000006);
+        poolManager = PoolManager(0x1F98400000000000000000000000000000000004);
+        positionManager = PositionManager(payable(0x4529A01c7A0410167c5740C487A8DE60232617bf));
+        yieldHarvestingHook = YieldHarvestingHook(0x777ef319C338C6ffE32A2283F603db603E8F2A80);
 
-        ModifyLiquidityParams memory liquidityParams = ModifyLiquidityParams({
-            tickLower: TickMath.minUsableTick(poolKey.tickSpacing),
-            tickUpper: TickMath.maxUsableTick(poolKey.tickSpacing),
-            liquidityDelta: 1e20,
-            salt: keccak256(abi.encodePacked(address(this), SWAP_HOOK_PERMISSIONS))
+        asset0 = IERC20(0x078D782b760474a361dDA0AF3839290b0EF57AD6); // USDC
+        asset1 = IERC20(0x9151434b16b9763660705744891fA906F660EcC5); // USDT
+
+        vaultWrapper0 = IERC4626(0x9C383Fa23Dd981b361F0495Ba53dDeB91c750064); //VII-EUSDC
+        vaultWrapper1 = IERC4626(0x7b793B1388e14F03e19dc562470e7D25B2Ae9b97); //VII-EUSDT
+
+        swapRouter = new PoolSwapTest(poolManager);
+
+        poolKey = PoolKey({
+            currency0: _IERC20ToCurrency(asset0),
+            currency1: _IERC20ToCurrency(asset1),
+            fee: 18,
+            tickSpacing: 1,
+            hooks: IHooks(address(0))
         });
-
-        modifyLiquidity(liquidityParams, sqrtRatioX96);
-
-        modifyMixedLiquidity(liquidityParams, sqrtRatioX96);
-
-        Currency currency0 =
-            address(asset0) < address(asset1) ? Currency.wrap(address(asset0)) : Currency.wrap(address(asset1));
-
-        bool isCurrency0SameAsAsset0 = currency0 == Currency.wrap(address(asset0));
 
         (, bytes32 salt) = HookMiner.find(
             address(this),
@@ -84,14 +95,18 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
         liquidityHelper = new LiquidityHelper(evc, positionManager, yieldHarvestingHook);
 
         assetsPoolKey = PoolKey({
-            currency0: isCurrency0SameAsAsset0 ? Currency.wrap(address(asset0)) : Currency.wrap(address(asset1)),
-            currency1: isCurrency0SameAsAsset0 ? Currency.wrap(address(asset1)) : Currency.wrap(address(asset0)),
+            currency0: Currency.wrap(address(asset0)),
+            currency1: Currency.wrap(address(asset1)),
             fee: poolKey.fee,
             tickSpacing: poolKey.tickSpacing,
             hooks: assetToAssetSwapHook
         });
 
         poolManager.initialize(assetsPoolKey, Constants.SQRT_PRICE_1_1);
+    }
+
+    function _IERC20ToCurrency(IERC20 token) internal pure returns (Currency) {
+        return Currency.wrap(address(token));
     }
 
     function _currencyToIERC20(Currency currency) internal pure returns (IERC20) {
@@ -127,7 +142,7 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
     }
 
     function test_assetsSwapExactAmountIn(uint256 amountIn, bool zeroForOne) public {
-        amountIn = bound(amountIn, 10, 1e18);
+        amountIn = bound(amountIn, 10, 1e6);
 
         Currency currencyIn = zeroForOne ? assetsPoolKey.currency0 : assetsPoolKey.currency1;
         Currency currencyOut = zeroForOne ? assetsPoolKey.currency1 : assetsPoolKey.currency0;
@@ -165,7 +180,7 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
     }
 
     function test_assetsSwapExactAmountOut(uint256 amountOut, bool zeroForOne) public {
-        amountOut = bound(amountOut, 10, 1e18);
+        amountOut = bound(amountOut, 10, 1e6);
 
         Currency currencyIn = zeroForOne ? assetsPoolKey.currency0 : assetsPoolKey.currency1;
         Currency currencyOut = zeroForOne ? assetsPoolKey.currency1 : assetsPoolKey.currency0;
@@ -200,13 +215,13 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
     }
 
     function testMintAndIncreasePosition(uint128 liquidityToAdd) public {
-        liquidityToAdd = uint128(bound(liquidityToAdd, 1, 1e18));
+        liquidityToAdd = uint128(bound(liquidityToAdd, 10, 1e8));
 
         int24 tickUpper = TickMath.maxUsableTick(poolKey.tickSpacing);
         int24 tickLower = TickMath.minUsableTick(poolKey.tickSpacing);
 
-        deal(address(asset0), address(this), liquidityToAdd);
-        deal(address(asset1), address(this), liquidityToAdd);
+        deal(address(asset0), address(this), 2 * liquidityToAdd);
+        deal(address(asset1), address(this), 2 * liquidityToAdd);
 
         asset0.approve(address(liquidityHelper), type(uint256).max);
         asset1.approve(address(liquidityHelper), type(uint256).max);
@@ -219,14 +234,14 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
             tickLower,
             tickUpper,
             liquidityToAdd,
-            uint128(liquidityToAdd),
-            uint128(liquidityToAdd),
+            uint128(2 * liquidityToAdd),
+            uint128(2 * liquidityToAdd),
             address(this),
             abi.encode(vaultWrapper0, vaultWrapper1)
         );
 
-        deal(address(asset0), address(this), liquidityToAdd);
-        deal(address(asset1), address(this), liquidityToAdd);
+        deal(address(asset0), address(this), 2 * liquidityToAdd);
+        deal(address(asset1), address(this), 2 * liquidityToAdd);
 
         positionManager.approve(address(liquidityHelper), tokenId);
 
@@ -234,8 +249,8 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
             poolKey,
             tokenId,
             liquidityToAdd,
-            uint128(liquidityToAdd),
-            uint128(liquidityToAdd),
+            uint128(2 * liquidityToAdd),
+            uint128(2 * liquidityToAdd),
             abi.encode(vaultWrapper0, vaultWrapper1)
         );
 

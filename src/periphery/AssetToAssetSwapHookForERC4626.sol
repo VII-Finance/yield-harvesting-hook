@@ -23,6 +23,7 @@ import {EVCUtil, LiquidityHelper} from "src/periphery/LiquidityHelper.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Context} from "lib/openzeppelin-contracts/contracts/utils/Context.sol";
 import {BaseAssetToVaultWrapperHelper} from "src/periphery/base/BaseAssetToVaultWrapperHelper.sol";
+import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 
 /// @notice This contract enables users to interact with pools created using the yield harvesting hook without needing to manually convert assets to or from vault wrappers.
 /// @dev It automates the conversion between ERC20 assets without any special logic, following the flow described in https://github.com/VII-Finance/yield-harvesting-hook/blob/periphery-contracts/docs/swap_flow.md.
@@ -39,6 +40,8 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelp
         IERC4626 vaultWrapperForCurrency0;
         IERC4626 vaultWrapperForCurrency1;
     }
+
+    uint256 public constant Q96_INVERSE_CONSTANT = 2 ** 192;
 
     /// @notice The hooks contract for vault wrapper pools
     IHooks public immutable yieldHarvestingHook;
@@ -97,6 +100,16 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelp
         return (BaseHook.beforeSwap.selector, returnDelta, 0);
     }
 
+    function invertSqrtPriceX96(uint160 x) internal pure returns (uint160 invX) {
+        invX = uint160(Q96_INVERSE_CONSTANT / x);
+        if (invX <= TickMath.MIN_SQRT_PRICE) {
+            return TickMath.MIN_SQRT_PRICE + 1;
+        }
+        if (invX >= TickMath.MAX_SQRT_PRICE) {
+            return TickMath.MAX_SQRT_PRICE - 1;
+        }
+    }
+
     /// @dev Struct to hold swap context data
     struct SwapContext {
         IERC4626 vaultWrapperIn;
@@ -106,6 +119,7 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelp
         IERC20 assetIn;
         IERC20 assetOut;
         PoolKey vaultWrapperPoolKey;
+        bool isVaultForCurrency0LessThanVaultForCurrency1;
     }
 
     /// @dev Initialize swap context with vault wrappers and assets
@@ -130,6 +144,9 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelp
 
         IERC4626 underlyingVault0 = _getUnderlyingVault(vaultWrapperForCurrency0);
         IERC4626 underlyingVault1 = _getUnderlyingVault(vaultWrapperForCurrency1);
+
+        context.isVaultForCurrency0LessThanVaultForCurrency1 =
+            address(vaultWrapperForCurrency0) < address(vaultWrapperForCurrency1);
 
         try vaultWrapperForCurrency1.asset() returns (address asset1) {
             underlyingVault1 = IERC4626(asset1);
@@ -179,7 +196,10 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelp
         // Swap vault wrapper shares
         uint256 vaultWrapperOutAmount = _performVaultWrapperSwap(
             context.vaultWrapperPoolKey,
-            params,
+            context.isVaultForCurrency0LessThanVaultForCurrency1 ? params.zeroForOne : !params.zeroForOne,
+            context.isVaultForCurrency0LessThanVaultForCurrency1
+                ? params.sqrtPriceLimitX96
+                : invertSqrtPriceX96(params.sqrtPriceLimitX96),
             vaultWrapperSharesMinted,
             true // isExactInput
         );
@@ -207,7 +227,10 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelp
         // Perform swap to get required vault wrapper shares
         uint256 vaultWrapperInAmount = _performVaultWrapperSwap(
             context.vaultWrapperPoolKey,
-            params,
+            context.isVaultForCurrency0LessThanVaultForCurrency1 ? params.zeroForOne : !params.zeroForOne,
+            context.isVaultForCurrency0LessThanVaultForCurrency1
+                ? params.sqrtPriceLimitX96
+                : invertSqrtPriceX96(params.sqrtPriceLimitX96),
             vaultWrapperSharesNeeded,
             false // isExactInput = false
         );
@@ -266,24 +289,23 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelp
     /// @dev Perform vault wrapper swap
     function _performVaultWrapperSwap(
         PoolKey memory poolKey,
-        SwapParams calldata originalParams,
+        bool zeroForOne,
+        uint160 sqrtPriceLimitX96,
         uint256 amount,
         bool isExactInput
     ) private returns (uint256 outputAmount) {
         SwapParams memory swapParams = SwapParams({
-            zeroForOne: originalParams.zeroForOne,
+            zeroForOne: zeroForOne,
             amountSpecified: isExactInput ? -amount.toInt256() : amount.toInt256(),
-            sqrtPriceLimitX96: originalParams.sqrtPriceLimitX96
+            sqrtPriceLimitX96: sqrtPriceLimitX96
         });
 
         BalanceDelta swapDelta = poolManager.swap(poolKey, swapParams, "");
 
         if (isExactInput) {
-            outputAmount =
-                originalParams.zeroForOne ? (swapDelta.amount1()).toUint256() : (swapDelta.amount0()).toUint256();
+            outputAmount = zeroForOne ? (swapDelta.amount1()).toUint256() : (swapDelta.amount0()).toUint256();
         } else {
-            outputAmount =
-                originalParams.zeroForOne ? (-swapDelta.amount0()).toUint256() : (-swapDelta.amount1()).toUint256();
+            outputAmount = zeroForOne ? (-swapDelta.amount0()).toUint256() : (-swapDelta.amount1()).toUint256();
         }
     }
 
@@ -337,7 +359,7 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelp
         poolManager.sync(Currency.wrap(address(asset)));
 
         if (address(vaultWrapper) != address(asset)) {
-            _withdraw(
+            _redeem(
                 vaultWrapper, address(underlyingVault), address(this), vaultWrapperSharesNeeded, address(poolManager)
             );
         } else {
