@@ -41,6 +41,8 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelp
         IERC4626 vaultWrapperForCurrency1;
     }
 
+    uint256 public constant Q96_INVERSE_CONSTANT = 2 ** 192;
+
     /// @notice The hooks contract for vault wrapper pools
     IHooks public immutable yieldHarvestingHook;
 
@@ -98,16 +100,14 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelp
         return (BaseHook.beforeSwap.selector, returnDelta, 0);
     }
 
-    //TODO: this needs to complete. Right now the sqrtPriceLimitX96 can only be prices at the ticks and that is not really correctt
     function invertSqrtPriceX96(uint160 x) internal pure returns (uint160 invX) {
-        if (TickMath.MIN_SQRT_PRICE + 1 <= x) {
-            return TickMath.MAX_SQRT_PRICE - 1;
-        }
-        if (TickMath.MAX_SQRT_PRICE - 1 >= x) {
+        invX = uint160(Q96_INVERSE_CONSTANT / x);
+        if (invX <= TickMath.MIN_SQRT_PRICE) {
             return TickMath.MIN_SQRT_PRICE + 1;
         }
-        int24 tick = TickMath.getTickAtSqrtPrice(x);
-        return TickMath.getSqrtPriceAtTick(-tick);
+        if (invX >= TickMath.MAX_SQRT_PRICE) {
+            return TickMath.MAX_SQRT_PRICE - 1;
+        }
     }
 
     /// @dev Struct to hold swap context data
