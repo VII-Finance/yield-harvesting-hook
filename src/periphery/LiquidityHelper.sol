@@ -52,7 +52,7 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
         uint128 amount0Max,
         uint128 amount1Max,
         bytes calldata hookData
-    ) internal returns (PoolKey memory) {
+    ) internal returns (PoolKey memory, uint128, uint128) {
         (IERC4626 vaultWrapper0, IERC4626 vaultWrapper1) = hookData.length == 0
             ? (IERC4626(address(0)), IERC4626(address(0)))
             : abi.decode(hookData, (IERC4626, IERC4626));
@@ -112,9 +112,10 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
         //currencies might be out of order at this point, so we need to sort them
         if (Currency.unwrap(poolKey.currency0) > Currency.unwrap(poolKey.currency1)) {
             (poolKey.currency0, poolKey.currency1) = (poolKey.currency1, poolKey.currency0);
+            (amount0Max, amount1Max) = (amount1Max, amount0Max);
         }
 
-        return poolKey;
+        return (poolKey, amount0Max, amount1Max);
     }
 
     function _callModifyLiquidity(
@@ -151,7 +152,7 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
     ) external payable returns (uint256 tokenId) {
         tokenId = positionManager.nextTokenId();
 
-        poolKey = _pullAndConvertAssets(poolKey, amount0Max, amount1Max, hookData);
+        (poolKey, amount0Max, amount1Max) = _pullAndConvertAssets(poolKey, amount0Max, amount1Max, hookData);
 
         bytes memory actionData =
             abi.encode(poolKey, tickLower, tickUpper, liquidity, amount0Max, amount1Max, owner, "");
@@ -167,7 +168,7 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
         uint128 amount1Max,
         bytes calldata hookData
     ) external payable onlyOwnerOf(tokenId) {
-        poolKey = _pullAndConvertAssets(poolKey, amount0Max, amount1Max, hookData);
+        (poolKey, amount0Max, amount1Max) = _pullAndConvertAssets(poolKey, amount0Max, amount1Max, hookData);
 
         bytes memory actionData = abi.encode(tokenId, liquidity, amount0Max, amount1Max, "");
         _callModifyLiquidity(uint8(Actions.INCREASE_LIQUIDITY), actionData, poolKey);
