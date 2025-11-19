@@ -18,9 +18,10 @@ contract BaseAssetToVaultWrapperHelper {
         address receiver
     ) internal returns (uint256) {
         uint256 underlyingVaultShares = _depositInUnderlyingVault(underlyingVault, asset, from, amount, address(this));
-        return _depositIntoERC4626Vault(
-            vaultWrapper, IERC20(underlyingVault), address(this), underlyingVaultShares, receiver
-        );
+        return
+            _depositIntoERC4626Vault(
+                vaultWrapper, IERC20(underlyingVault), address(this), underlyingVaultShares, receiver
+            );
     }
 
     /// @dev for aave wrappers, override this function

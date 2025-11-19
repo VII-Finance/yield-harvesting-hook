@@ -212,12 +212,7 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
         super.test_previewDeposit(init, assets);
     }
 
-    function test_deposit(Init memory init, uint256 assets, uint256 allowance)
-        public
-        virtual
-        override
-        checkInvariants
-    {
+    function test_deposit(Init memory init, uint256 assets, uint256 allowance) public virtual override checkInvariants {
         super.test_deposit(init, assets, allowance);
     }
 

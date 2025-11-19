@@ -377,10 +377,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         );
 
         PositionConfig memory config = PositionConfig({
-            poolKey: poolKey,
-            tickLower: params.tickLower,
-            tickUpper: params.tickUpper,
-            salt: params.salt
+            poolKey: poolKey, tickLower: params.tickLower, tickUpper: params.tickUpper, salt: params.salt
         });
 
         BalanceDelta feesOwed = FeeMath.getFeesOwed(poolManager, config, address(modifyLiquidityRouter));
@@ -546,10 +543,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
         // Verify fees are distributed correctly by modifying liquidity with 0 delta
         PositionConfig memory config = PositionConfig({
-            poolKey: mixedPoolKey,
-            tickLower: params.tickLower,
-            tickUpper: params.tickUpper,
-            salt: params.salt
+            poolKey: mixedPoolKey, tickLower: params.tickLower, tickUpper: params.tickUpper, salt: params.salt
         });
 
         BalanceDelta feesOwed = FeeMath.getFeesOwed(poolManager, config, address(modifyLiquidityRouter));

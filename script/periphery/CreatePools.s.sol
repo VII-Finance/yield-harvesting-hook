@@ -56,8 +56,8 @@ contract CreatePoolsScript is Script {
 
         (, int24 referencePoolTick,,) = poolManager.getSlot0(referenceAssetsPoolKey.toId());
 
-        IERC4626 vault0 = IERC4626(0xA6be43F0505Da6e37B0805e1A0B7AaCb3065F0c8); //eUSDC
-        IERC4626 vault1 = IERC4626(0xFeA428F58c678B3f14Fd750200bF14906F21e53c); //eUSDT0
+        IERC4626 vault0 = IERC4626(0x6eAe95ee783e4D862867C4e0E4c3f4B95AA682Ba); //eUSDC
+        IERC4626 vault1 = IERC4626(0xD49181c522eCDB265f0D9C175Cf26FFACE64eAD3); //eUSDT0
 
         require(vault0.asset() == Currency.unwrap(referenceAssetsPoolKey.currency0), "vault0 asset mismatch");
         require(vault1.asset() == Currency.unwrap(referenceAssetsPoolKey.currency1), "vault1 asset mismatch");
@@ -74,8 +74,7 @@ contract CreatePoolsScript is Script {
 
         vm.startBroadcast();
 
-        (ERC4626VaultWrapper vaultWrapper0, ERC4626VaultWrapper vaultWrapper1) = erc4626VaultWrapperFactory
-            .createERC4626VaultPool(
+        (ERC4626VaultWrapper vaultWrapper0, ERC4626VaultWrapper vaultWrapper1) = erc4626VaultWrapperFactory.createERC4626VaultPool(
             vault0,
             vault1,
             referenceAssetsPoolKey.fee,
@@ -83,12 +82,17 @@ contract CreatePoolsScript is Script {
             TickMath.getSqrtPriceAtTick(referencePoolTick)
         );
 
+        // (ERC4626VaultWrapper vaultWrapper0, ERC4626VaultWrapper vaultWrapper1) = (ERC4626VaultWrapper(0xE1b1387ec4ac848f9B7A0E7750bCb330a2d390df), ERC4626VaultWrapper(0x868669425240F69e69BDBf152f42F8F8a5024882));
+
         bool isVaultWrapper0Currency0 = vaultWrapper0 < vaultWrapper1;
 
         require(isVaultWrapper0Currency0Predicted == isVaultWrapper0Currency0, "vault wrapper order mismatch");
 
         //let's also initialize assetToAssetSwapHook as well
         referenceAssetsPoolKey.hooks = IHooks(address(assetToAssetSwapHook));
+
+        //set default vault wrappers in yield harvesting hook
+        assetToAssetSwapHook.setDefaultVaultWrappers(referenceAssetsPoolKey, vaultWrapper0, vaultWrapper1);
 
         poolManager.initialize(referenceAssetsPoolKey, TickMath.getSqrtPriceAtTick(0));
 
@@ -108,20 +112,20 @@ contract CreatePoolsScript is Script {
         PoolKey memory referenceAssetsPoolKey
     ) public {
         if (
-            _currencyToIERC20(referenceAssetsPoolKey.currency0).allowance(msg.sender, address(liquidityHelper))
+            _currencyToIERC20(referenceAssetsPoolKey.currency0)
+                    .allowance(0x12e74f3C61F6b4d17a9c3Fdb3F42e8f18a8bB394, address(liquidityHelper))
                 < currency0AmountToAdd
         ) {
-            _currencyToIERC20(referenceAssetsPoolKey.currency0).forceApprove(
-                address(liquidityHelper), type(uint256).max
-            );
+            _currencyToIERC20(referenceAssetsPoolKey.currency0)
+                .forceApprove(address(liquidityHelper), type(uint256).max);
         }
         if (
-            _currencyToIERC20(referenceAssetsPoolKey.currency1).allowance(msg.sender, address(liquidityHelper))
+            _currencyToIERC20(referenceAssetsPoolKey.currency1)
+                    .allowance(0x12e74f3C61F6b4d17a9c3Fdb3F42e8f18a8bB394, address(liquidityHelper))
                 < currency1AmountToAdd
         ) {
-            _currencyToIERC20(referenceAssetsPoolKey.currency1).forceApprove(
-                address(liquidityHelper), type(uint256).max
-            );
+            _currencyToIERC20(referenceAssetsPoolKey.currency1)
+                .forceApprove(address(liquidityHelper), type(uint256).max);
         }
 
         liquidityHelper.mintPosition(

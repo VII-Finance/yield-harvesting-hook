@@ -122,7 +122,9 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
         uint8 actionType, // either Actions.MINT_POSITION or Actions.INCREASE_LIQUIDITY
         bytes memory actionData, // encoded params for first action,
         PoolKey memory poolKey
-    ) internal {
+    )
+        internal
+    {
         bytes memory actions = new bytes(5);
         actions[0] = bytes1(actionType);
         actions[1] = bytes1(uint8(Actions.SETTLE));
