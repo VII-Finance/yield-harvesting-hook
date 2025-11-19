@@ -151,14 +151,14 @@ contract AssetToAssetSwapHookForkTest is Test {
     }
 
     function addWarmLiquidity() public {
-        deal(address(asset0), address(this), 1e12);
-        deal(address(asset1), address(this), 1e12);
+        deal(address(asset0), address(this), 1e6);
+        deal(address(asset1), address(this), 1e6);
 
         asset0.approve(address(assetToAssetSwapHook), type(uint256).max);
         asset1.approve(address(assetToAssetSwapHook), type(uint256).max);
 
-        assetToAssetSwapHook.addWarmLiquidity(vaultWrapper0, 1e12);
-        assetToAssetSwapHook.addWarmLiquidity(vaultWrapper1, 1e12);
+        assetToAssetSwapHook.addWarmLiquidity(vaultWrapper0, 1e6);
+        assetToAssetSwapHook.addWarmLiquidity(vaultWrapper1, 1e6);
     }
 
     function test_assetsSwapExactAmountIn(uint256 amountIn, bool zeroForOne, bool shouldHaveWarmLiquidity) public {
@@ -378,10 +378,22 @@ contract AssetToAssetSwapHookForkTest is Test {
         );
     }
 
-    // function test_rebalance(uint256 amountIn, bool zeroForOne) public{
-    function test_rebalance() public {
-        test_assetsSwapExactAmountIn(1e6, true, true);
+    function test_rebalance(uint256 amount, bool zeroForOne, bool isExactIn) public {
+        if (isExactIn) test_assetsSwapExactAmountIn(amount, zeroForOne, true);
+        else test_assetsSwapExactAmountOut(amount, zeroForOne, true);
+
         assetToAssetSwapHook.reBalance(vaultWrapper0);
-        // assetToAssetSwapHook.reBalance(vaultWrapper1);
+        assetToAssetSwapHook.reBalance(vaultWrapper1);
+
+        assertApproxEqAbs(
+            poolManager.balanceOf(address(assetToAssetSwapHook), Currency.wrap(address(vaultWrapper0)).toId()),
+            poolManager.balanceOf(address(assetToAssetSwapHook), Currency.wrap(address(asset0)).toId()),
+            1
+        );
+        assertApproxEqAbs(
+            poolManager.balanceOf(address(assetToAssetSwapHook), Currency.wrap(address(vaultWrapper1)).toId()),
+            poolManager.balanceOf(address(assetToAssetSwapHook), Currency.wrap(address(asset1)).toId()),
+            1
+        );
     }
 }
