@@ -4,6 +4,8 @@ pragma solidity ^0.8.26;
 import {IERC4626} from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {LowLevelCall} from "lib/openzeppelin-contracts/contracts/utils/LowLevelCall.sol";
+import {Memory} from "lib/openzeppelin-contracts/contracts/utils/Memory.sol";
 
 contract BaseAssetToVaultWrapperHelper {
     using SafeERC20 for IERC20;
@@ -136,11 +138,16 @@ contract BaseAssetToVaultWrapperHelper {
     }
 
     function _getUnderlyingVault(IERC4626 vaultWrapper) internal view returns (IERC4626 underlyingVault) {
-        try vaultWrapper.asset() returns (address asset) {
-            underlyingVault = IERC4626(asset);
-        } catch {
-            underlyingVault = IERC4626(address(0));
-        }
-        return underlyingVault;
+        Memory.Pointer ptr = Memory.getFreeMemoryPointer();
+        (bool success, bytes32 underlyingVaultAddress, ) = LowLevelCall.staticcallReturn64Bytes(
+            address(vaultWrapper),
+            abi.encodeCall(IERC4626.asset, ())
+        );
+        Memory.setFreeMemoryPointer(ptr);
+
+        return
+            (success && LowLevelCall.returnDataSize() >= 32 && uint160(uint256(underlyingVaultAddress)) <= type(uint160).max)
+                ? IERC4626(address(uint160(uint256(underlyingVaultAddress))))
+                : IERC4626(address(0));
     }
 }

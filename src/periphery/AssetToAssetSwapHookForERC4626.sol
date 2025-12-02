@@ -165,12 +165,6 @@ contract AssetToAssetSwapHookForERC4626 is
         context.isVaultForCurrency0LessThanVaultForCurrency1 =
             address(vaultWrapperForCurrency0) < address(vaultWrapperForCurrency1);
 
-        try vaultWrapperForCurrency1.asset() returns (address asset1) {
-            underlyingVault1 = IERC4626(asset1);
-        } catch {
-            underlyingVault1 = IERC4626(address(0));
-        }
-
         (context.vaultWrapperIn, context.vaultWrapperOut) = params.zeroForOne
             ? (vaultWrapperForCurrency0, vaultWrapperForCurrency1)
             : (vaultWrapperForCurrency1, vaultWrapperForCurrency0);
@@ -231,9 +225,15 @@ contract AssetToAssetSwapHookForERC4626 is
     {
         amountOut = params.amountSpecified.toUint256();
 
-        // Calculate required vault wrapper shares for desired output
-        uint256 underlyingVaultSharesNeeded = context.underlyingVaultOut.previewWithdraw(amountOut);
-        uint256 vaultWrapperSharesNeeded = context.vaultWrapperOut.previewWithdraw(underlyingVaultSharesNeeded);
+        uint256 vaultWrapperSharesNeeded;
+        if (address(context.assetOut) != address(context.vaultWrapperOut)) {
+            // Calculate required vault wrapper shares for desired output
+            uint256 underlyingVaultSharesNeeded = context.underlyingVaultOut.previewWithdraw(amountOut);
+            vaultWrapperSharesNeeded = context.vaultWrapperOut.previewWithdraw(underlyingVaultSharesNeeded);
+        } else {
+            // there is no need for conversion if assetOut is same as vaultWrapperOut
+            vaultWrapperSharesNeeded = amountOut;
+        }
 
         // Perform swap to get required vault wrapper shares
         uint256 vaultWrapperInAmount = _performVaultWrapperSwap(
@@ -355,7 +355,7 @@ contract AssetToAssetSwapHookForERC4626 is
     ) internal returns (uint256 assetAmount) {
         poolManager.sync(Currency.wrap(address(vaultWrapper)));
 
-        if (address(underlyingVault) != address(vaultWrapper)) {
+        if (address(asset) != address(vaultWrapper)) {
             //if this address has sufficient claims from warmLiquidity then skip the mint
             assetAmount = underlyingVault.previewMint(vaultWrapper.previewMint(vaultWrapperAmount));
 

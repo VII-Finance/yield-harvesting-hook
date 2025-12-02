@@ -125,7 +125,7 @@ contract AssetToAssetSwapHookForkTest is Test {
     function sortVaultWrappers(IERC4626 vaultWrapperA, IERC4626 vaultWrapperB, address asset0, address asset1)
         internal
         view
-        returns (IERC4626 vaultWrapper0, IERC4626 vaultWrapper1)
+        returns (IERC4626, IERC4626)
     {
         IERC4626 underlyingVaultA = IERC4626(vaultWrapperA.asset());
         IERC4626 underlyingVaultB = IERC4626(vaultWrapperB.asset());

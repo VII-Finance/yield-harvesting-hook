@@ -71,8 +71,12 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
 
         Currency currency0 =
             address(asset0) < address(asset1) ? Currency.wrap(address(asset0)) : Currency.wrap(address(asset1));
+        Currency mixedAssetsCurrency0 = address(rawAsset) < address(mixedVaultAsset)
+            ? Currency.wrap(address(rawAsset))
+            : Currency.wrap(address(mixedVaultAsset));
 
         bool isCurrency0SameAsAsset0 = currency0 == Currency.wrap(address(asset0));
+        bool isMixedCurrency0SameAsRawAsset = mixedAssetsCurrency0 == Currency.wrap(address(rawAsset));
 
         (, bytes32 salt) = HookMiner.find(
             address(this),
@@ -94,7 +98,21 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
             hooks: assetToAssetSwapHook
         });
 
+        mixedAssetPoolKey = PoolKey({
+            currency0: isMixedCurrency0SameAsRawAsset
+                ? Currency.wrap(address(rawAsset))
+                : Currency.wrap(address(mixedVaultAsset)),
+            currency1: isMixedCurrency0SameAsRawAsset
+                ? Currency.wrap(address(mixedVaultAsset))
+                : Currency.wrap(address(rawAsset)),
+            fee: poolKey.fee,
+            tickSpacing: poolKey.tickSpacing,
+            hooks: assetToAssetSwapHook
+        });
+
         poolManager.initialize(assetsPoolKey, Constants.SQRT_PRICE_1_1);
+
+        poolManager.initialize(mixedAssetPoolKey, Constants.SQRT_PRICE_1_1);
     }
 
     function _currencyToIERC20(Currency currency) internal pure returns (IERC20) {
@@ -129,12 +147,16 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
         assetToAssetSwapHook.setDefaultVaultWrappers(assetsPoolKey, associatedVault0, associatedVault1);
     }
 
-    function test_assetsSwapExactAmountIn(uint256 amountIn, bool zeroForOne) public {
+    function swapExactAmountInWithTests(
+        PoolKey memory poolKey,
+        uint256 amountIn,
+        bool zeroForOne,
+        bytes memory hookData
+    ) public {
         amountIn = bound(amountIn, 10, 1e18);
 
-        Currency currencyIn = zeroForOne ? assetsPoolKey.currency0 : assetsPoolKey.currency1;
-        Currency currencyOut = zeroForOne ? assetsPoolKey.currency1 : assetsPoolKey.currency0;
-
+        Currency currencyIn = zeroForOne ? poolKey.currency0 : poolKey.currency1;
+        Currency currencyOut = zeroForOne ? poolKey.currency1 : poolKey.currency0;
         deal(Currency.unwrap(currencyIn), address(this), amountIn);
         _currencyToIERC20(currencyIn).approve(address(swapRouter), amountIn);
 
@@ -157,21 +179,46 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
         );
 
         BalanceDelta swapDelta = swapRouter.swap(
-            assetsPoolKey,
-            swapParams,
-            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
-            abi.encode(associatedVault0, associatedVault1)
+            poolKey, swapParams, PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}), hookData
         );
 
         uint256 assetOut = SafeCast.toUint256(zeroForOne ? swapDelta.amount1() : swapDelta.amount0());
         assertEq(assetOut, currencyOut.balanceOf(address(this)) - assetBalanceBefore, "Incorrect asset out amount");
     }
 
-    function test_assetsSwapExactAmountOut(uint256 amountOut, bool zeroForOne) public {
+    function test_assetsSwapExactAmountIn(uint256 amountIn, bool zeroForOne) public {
+        (IERC4626 associatedVault0, IERC4626 associatedVault1) = sortVaultWrappers(
+            vaultWrapper0,
+            vaultWrapper1,
+            Currency.unwrap(assetsPoolKey.currency0),
+            Currency.unwrap(assetsPoolKey.currency1)
+        );
+
+        swapExactAmountInWithTests(assetsPoolKey, amountIn, zeroForOne, abi.encode(associatedVault0, associatedVault1));
+    }
+
+    function test_assetsSwapExactAmountIn_MixedAssets(uint256 amountIn, bool zeroForOne) public {
+        swapExactAmountInWithTests(
+            mixedAssetPoolKey,
+            amountIn,
+            zeroForOne,
+            abi.encode(
+                rawAsset < mixedVaultAsset ? IERC4626(address(rawAsset)) : IERC4626(address(mixedVaultWrapper)),
+                rawAsset < mixedVaultAsset ? IERC4626(address(mixedVaultWrapper)) : IERC4626(address(rawAsset))
+            )
+        );
+    }
+
+    function swapExactAmountOutWithTests(
+        PoolKey memory poolKey,
+        uint256 amountOut,
+        bool zeroForOne,
+        bytes memory hookData
+    ) public {
         amountOut = bound(amountOut, 10, 1e18);
 
-        Currency currencyIn = zeroForOne ? assetsPoolKey.currency0 : assetsPoolKey.currency1;
-        Currency currencyOut = zeroForOne ? assetsPoolKey.currency1 : assetsPoolKey.currency0;
+        Currency currencyIn = zeroForOne ? poolKey.currency0 : poolKey.currency1;
+        Currency currencyOut = zeroForOne ? poolKey.currency1 : poolKey.currency0;
 
         deal(Currency.unwrap(currencyIn), address(this), 2 * amountOut);
         _currencyToIERC20(currencyIn).approve(address(swapRouter), 2 * amountOut);
@@ -187,19 +234,31 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
             sqrtPriceLimitX96: zeroForOne ? TickMath.MIN_SQRT_PRICE + 1 : TickMath.MAX_SQRT_PRICE - 1
         });
 
-        (IERC4626 associatedVault0, IERC4626 associatedVault1) =
-            sortVaultWrappers(vaultWrapper0, vaultWrapper1, address(asset0), address(asset1));
-
-        vm.startPrank(initialOwner);
-        assetToAssetSwapHook.setDefaultVaultWrappers(assetsPoolKey, associatedVault0, associatedVault1);
-        vm.stopPrank();
-
         BalanceDelta swapDelta = swapRouter.swap(
-            assetsPoolKey, swapParams, PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}), ""
+            poolKey, swapParams, PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}), hookData
         );
 
         uint256 assetIn = SafeCast.toUint256(zeroForOne ? -swapDelta.amount0() : -swapDelta.amount1());
         assertEq(assetIn, assetBalanceBefore - currencyIn.balanceOf(address(this)), "Incorrect asset out amount");
+    }
+
+    function test_assetsSwapExactAmountOut(uint256 amountOut, bool zeroForOne) public {
+        (IERC4626 associatedVault0, IERC4626 associatedVault1) =
+            sortVaultWrappers(vaultWrapper0, vaultWrapper1, address(asset0), address(asset1));
+
+        swapExactAmountOutWithTests(assetsPoolKey, amountOut, zeroForOne, abi.encode(associatedVault0, associatedVault1));
+    }
+
+    function test_assetsSwapExactAmountOut_MixedAssets(uint256 amountOut, bool zeroForOne) public {
+        swapExactAmountOutWithTests(
+            mixedAssetPoolKey,
+            amountOut,
+            zeroForOne,
+            abi.encode(
+                rawAsset < mixedVaultAsset ? IERC4626(address(rawAsset)) : IERC4626(address(mixedVaultWrapper)),
+                rawAsset < mixedVaultAsset ? IERC4626(address(mixedVaultWrapper)) : IERC4626(address(rawAsset))
+            )
+        );
     }
 
     function testMintAndIncreasePosition(uint128 liquidityToAdd) public {
