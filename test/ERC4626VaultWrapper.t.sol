@@ -329,8 +329,9 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
                 if (shares > 0) {
                     vm.prank(user);
                     try ERC4626VaultWrapper(_vault_).redeem(shares, user, user) {
-                        //all good
-                    } catch {
+                    //all good
+                    }
+                    catch {
                         isRedeemFailingForSomeUsers = true;
                         break;
                     }
@@ -355,8 +356,9 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
                     if (shares > 0) {
                         vm.prank(user);
                         try ERC4626VaultWrapper(_vault_).redeem(shares, user, user) {
-                            //all good
-                        } catch {
+                        //all good
+                        }
+                        catch {
                             isRedeemFailingForSomeUsers = true;
                             break;
                         }

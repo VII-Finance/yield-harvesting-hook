@@ -20,8 +20,6 @@ import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 import {IHookEvents} from "src/interfaces/IHookEvents.sol";
-import {IPositionManager} from "lib/v4-periphery/src/interfaces/IPositionManager.sol";
-import {EVCUtil, LiquidityHelper} from "src/periphery/LiquidityHelper.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Context} from "lib/openzeppelin-contracts/contracts/utils/Context.sol";
 import {BaseAssetToVaultWrapperHelper} from "src/periphery/base/BaseAssetToVaultWrapperHelper.sol";
