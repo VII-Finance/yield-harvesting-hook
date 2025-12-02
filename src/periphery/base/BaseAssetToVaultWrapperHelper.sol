@@ -139,15 +139,13 @@ contract BaseAssetToVaultWrapperHelper {
 
     function _getUnderlyingVault(IERC4626 vaultWrapper) internal view returns (IERC4626 underlyingVault) {
         Memory.Pointer ptr = Memory.getFreeMemoryPointer();
-        (bool success, bytes32 underlyingVaultAddress, ) = LowLevelCall.staticcallReturn64Bytes(
-            address(vaultWrapper),
-            abi.encodeCall(IERC4626.asset, ())
-        );
+        (bool success, bytes32 underlyingVaultAddress,) =
+            LowLevelCall.staticcallReturn64Bytes(address(vaultWrapper), abi.encodeCall(IERC4626.asset, ()));
         Memory.setFreeMemoryPointer(ptr);
 
-        return
-            (success && LowLevelCall.returnDataSize() >= 32 && uint160(uint256(underlyingVaultAddress)) <= type(uint160).max)
-                ? IERC4626(address(uint160(uint256(underlyingVaultAddress))))
-                : IERC4626(address(0));
+        return (success && LowLevelCall.returnDataSize() >= 32
+                && uint160(uint256(underlyingVaultAddress)) <= type(uint160).max)
+            ? IERC4626(address(uint160(uint256(underlyingVaultAddress))))
+            : IERC4626(address(0));
     }
 }

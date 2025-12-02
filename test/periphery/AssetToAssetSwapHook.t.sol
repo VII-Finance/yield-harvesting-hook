@@ -246,7 +246,9 @@ contract AssetToAssetSwapHookTest is YieldHarvestingHookTest {
         (IERC4626 associatedVault0, IERC4626 associatedVault1) =
             sortVaultWrappers(vaultWrapper0, vaultWrapper1, address(asset0), address(asset1));
 
-        swapExactAmountOutWithTests(assetsPoolKey, amountOut, zeroForOne, abi.encode(associatedVault0, associatedVault1));
+        swapExactAmountOutWithTests(
+            assetsPoolKey, amountOut, zeroForOne, abi.encode(associatedVault0, associatedVault1)
+        );
     }
 
     function test_assetsSwapExactAmountOut_MixedAssets(uint256 amountOut, bool zeroForOne) public {

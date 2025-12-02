@@ -32,7 +32,7 @@ import {IUnlockCallback} from "@uniswap/v4-core/src/interfaces/callback/IUnlockC
 /// @dev It automates the conversion between ERC20 assets without any special logic, following the flow described in https://github.com/VII-Finance/yield-harvesting-hook/blob/periphery-contracts/docs/swap_flow.md.
 /// @dev Only vault wrappers with underlying vaults that support the ERC4626 interface are supported; Aave vaults are not supported.
 /// @dev hookData should contain two encoded IERC4626 vault wrappers (for token0 and token1 respectively), or address(0) if no vault wrapper is used for that token
-/// @dev if hookDat is not provided then default vault wrappers decided by the hook owner will be used.
+///      if hookData is not provided then default vault wrappers decided by the hook owner will be used.
 contract AssetToAssetSwapHookForERC4626 is
     BaseHook,
     BaseAssetToVaultWrapperHelper,
@@ -157,6 +157,15 @@ contract AssetToAssetSwapHookForERC4626 is
                 defaultVaultWrappersSetByOwner.vaultWrapperForCurrency0,
                 defaultVaultWrappersSetByOwner.vaultWrapperForCurrency1
             );
+        }
+
+        //if vault wrappers are not provided in the hook data or set by the owner, use the assets directly
+        if (vaultWrapperForCurrency0 == IERC4626(address(0))) {
+            vaultWrapperForCurrency0 = IERC4626(Currency.unwrap(key.currency0));
+        }
+
+        if (vaultWrapperForCurrency1 == IERC4626(address(0))) {
+            vaultWrapperForCurrency1 = IERC4626(Currency.unwrap(key.currency1));
         }
 
         IERC4626 underlyingVault0 = _getUnderlyingVault(vaultWrapperForCurrency0);

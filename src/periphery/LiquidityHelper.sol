@@ -20,7 +20,9 @@ interface IPositionManagerExtended is IPositionManager {
     function WETH9() external view returns (address);
 }
 
-///@dev This doesn't support aave vaults. Only vault wrappers that have underlying vaults that support ERC4626 interface are supported
+/// @dev This doesn't support aave vaults. Only vault wrappers that have underlying vaults that support ERC4626 interface are supported.
+/// @dev This contract will have approvals of the Liquidity Positions NFTs. We only care about bugs that lead to loss of NFTs here.
+///      Otherwise it is up to the user to make sure this contract doesn't hold any funds.
 contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
