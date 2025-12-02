@@ -54,6 +54,13 @@ contract ERC4626VaultWrapperFactory is Ownable {
         poolManager.initialize(poolKey, sqrtPriceX96);
     }
 
+    /**
+     * @notice If someone front-runs the creation of the pool before user, user function call fails and that frontrunner can
+     * set the initial price to whatever they want.
+     * 1. If you are doing things atomically always make sure the pool is not already initialized before making the create call.
+     * 2. Before adding liquidity always make sure the price of the pool is the right price and if not conduct the arbitrage
+     * to bring the price to the right price.
+     */
     function createERC4626VaultPool(
         IERC4626 underlyingVaultA,
         IERC4626 underlyingVaultB,
