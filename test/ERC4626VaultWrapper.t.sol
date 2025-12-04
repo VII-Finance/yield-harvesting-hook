@@ -220,12 +220,7 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
         super.test_previewDeposit(init, assets);
     }
 
-    function test_deposit(Init memory init, uint256 assets, uint256 allowance)
-        public
-        virtual
-        override
-        checkInvariants
-    {
+    function test_deposit(Init memory init, uint256 assets, uint256 allowance) public virtual override checkInvariants {
         super.test_deposit(init, assets, allowance);
     }
 
@@ -334,8 +329,9 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
                 if (shares > 0) {
                     vm.prank(user);
                     try ERC4626VaultWrapper(_vault_).redeem(shares, user, user) {
-                        //all good
-                    } catch {
+                    //all good
+                    }
+                    catch {
                         isRedeemFailingForSomeUsers = true;
                         break;
                     }
@@ -360,8 +356,9 @@ contract ERC4626VaultWrapperTest is ERC4626Test {
                     if (shares > 0) {
                         vm.prank(user);
                         try ERC4626VaultWrapper(_vault_).redeem(shares, user, user) {
-                            //all good
-                        } catch {
+                        //all good
+                        }
+                        catch {
                             isRedeemFailingForSomeUsers = true;
                             break;
                         }

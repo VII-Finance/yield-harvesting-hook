@@ -1,0 +1,26 @@
+{
+  "lib/erc4626-tests": {
+    "rev": "232ff9ba8194e406967f52ecc5cb52ed764209e9"
+  },
+  "lib/ethereum-vault-connector": {
+    "tag": {
+      "name": "v1.0.1",
+      "rev": "a7d3c29ef7e4964736e47675e0588630d6afbfd7"
+    }
+  },
+  "lib/forge-std": {
+    "rev": "77041d2ce690e692d6e03cc812b57d1ddaa4d505"
+  },
+  "lib/openzeppelin-contracts": {
+    "tag": {
+      "name": "v5.5.0",
+      "rev": "fcbae5394ae8ad52d8e580a3477db99814b9d565"
+    }
+  },
+  "lib/solady": {
+    "rev": "a5bb996e91aae5b0c068087af7594d92068b12f1"
+  },
+  "lib/v4-periphery": {
+    "rev": "ad04c9f24a170accf5ea1b2836bbafd514537ca6"
+  }
+}
