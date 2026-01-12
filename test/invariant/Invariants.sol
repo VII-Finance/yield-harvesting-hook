@@ -32,16 +32,20 @@ contract Invariants is Test {
         targetContract(address(handler));
     }
 
-    function checkVaultWrapperSolvency(IERC4626 vaultWrapper) internal view {
+    function checkVaultWrapperSolvency(BaseVaultWrapper vaultWrapper) internal view {
         IERC4626 underlyingVault = IERC4626(vaultWrapper.asset());
-        assertLe(
-            vaultWrapper.totalSupply(), underlyingVault.previewRedeem(underlyingVault.balanceOf(address(vaultWrapper)))
-        );
+
+        uint256 vaultSharesWorthInUnderlyingAssets =
+            underlyingVault.previewRedeem(underlyingVault.balanceOf(address(vaultWrapper)));
+        assertLe(vaultWrapper.totalSupply(), vaultSharesWorthInUnderlyingAssets);
+
+        // also total supply + pending yield should be equal to the vault share balance in asset terms
+        assertEq(vaultWrapper.totalSupply() + vaultWrapper.totalPendingYield(), vaultSharesWorthInUnderlyingAssets);
     }
 
     // total supply of vault wrappers should always be less than the worth of underlying vault share balance in asset terms
     function invariant_check_solvency() public view {
-        checkVaultWrapperSolvency(IERC4626(address(handler.vaultWrapper0())));
-        checkVaultWrapperSolvency(IERC4626(address(handler.vaultWrapper1())));
+        checkVaultWrapperSolvency(handler.vaultWrapper0());
+        checkVaultWrapperSolvency(handler.vaultWrapper1());
     }
 }
