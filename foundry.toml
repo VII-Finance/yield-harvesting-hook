@@ -12,6 +12,11 @@ cbor_metadata = false
 [fuzz]
 runs = 10_000
 
+[invariant]
+runs = 10_000
+depth = 50
+fail_on_revert = true
+
 [rpc_endpoints]
 mainnet = "${MAINNET_RPC_URL}" 
 base= "${BASE_RPC_URL}"
