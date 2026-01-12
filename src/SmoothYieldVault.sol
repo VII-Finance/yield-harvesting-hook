@@ -9,6 +9,10 @@ import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 /// @title SmoothYieldVault
 /// @notice ERC4626 vault that smooths yield distribution over time for yield generating rebasing tokens instead of immediate distribution
+/// This is needed because to be compatible with yield harvesting hooks, yield generating vaults need to distribute yield over time instead of immediately
+/// The lending protocols do that by design (distribute interest every second), but for rebasing tokens like stETH, yield is distributed immediately every 24 hours (or so)
+/// If yield is distributed immediately, users can add liquidity in the DEX right before the yield is harvested and remove liquidity right after, capturing all of the yield without providing real liquidity
+/// By smoothing yield distribution over time, users providing liquidity will receive yield proportional to the time they provided liquidity
 contract SmoothYieldVault is Ownable, ERC4626 {
     /// @notice Last synced asset balance
     uint256 public lastSyncedBalance;
@@ -39,6 +43,7 @@ contract SmoothYieldVault is Ownable, ERC4626 {
     function _profit() internal view returns (uint256) {
         uint256 currentBalance = IERC20(asset()).balanceOf(address(this));
         /// @dev If there is a negative yield, no profit will be reported until it is recovered by positive yield
+        /// this is an expected behavior and users need to be ok with the consequence of negative yield periods
         return currentBalance < lastSyncedBalance ? 0 : currentBalance - lastSyncedBalance;
     }
 
@@ -49,8 +54,14 @@ contract SmoothYieldVault is Ownable, ERC4626 {
     ///   * 1 period passed: half of profit available immediately, the other half smoothed over next period
     ///   * 2 periods passed: 2/3 of profit available immediately, 1/3 smoothed over next period
     ///   * n periods passed: n/(n+1) of profit available immediately, 1/(n+1) smoothed over next period
+    /// - The assumption is that syncs will happen multiple times within a smoothing period under normal usage
+    ///   this logic still handles the case where that does not happen and it is expected that there will be spikes
+    ///   in profit distribution in those cases.
     function _smoothedProfit() internal view returns (uint256 smoothedProfit, uint256 newRemainingPeriod) {
         uint256 timeElapsed = block.timestamp - lastSyncedTime;
+        // when timeElapsed is 0, it is expected that this is a no-op call
+        // so in the same block if sync is called and then yield is distributed in underlying asset increases and sync is called again,
+        // it is an expected behavior that no profit is distributed in the second sync.
         if (timeElapsed == 0) {
             return (0, remainingPeriod);
         } else {
