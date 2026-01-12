@@ -56,7 +56,7 @@ contract Handler is YieldHarvestingHookTest {
     }
 
     // the createFuzzyLiquidityParams in the Fuzzers library does not support multiple actors
-    // getLiquidityDeltaFromAmounts has the checks to make sure the resulting liquidity amounts do not exceed type(uint128).max when 
+    // getLiquidityDeltaFromAmounts has the checks to make sure the resulting liquidity amounts do not exceed type(uint128).max when
     // adding liquidity
     function createFuzzyLiquidityParams(ModifyLiquidityParams memory params, int24 tickSpacing_, uint160 sqrtPriceX96)
         internal
@@ -187,7 +187,6 @@ contract Handler is YieldHarvestingHookTest {
         amount = bound(amount, 0, maxWithdrawable);
         vaultWrapper0.withdraw(amount, currentActor, currentActor);
     }
-    
 
     function directDepositToERC4626Vault() external {}
 
