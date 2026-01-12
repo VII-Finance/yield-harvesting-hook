@@ -78,14 +78,16 @@ contract PoolModifyLiquidityTest is PoolTestBase {
             int128(liquidityBefore) + data.params.liquidityDelta == int128(liquidityAfter), "liquidity change incorrect"
         );
 
-        if (data.params.liquidityDelta < 0) {
-            // only because of this we had to copy the whole file from https://github.com/Uniswap/v4-core/blob/main/src/test/PoolModifyLiquidityTest.sol
-            assert(delta0 >= 0 || delta1 >= 0);
-            assert(!(delta0 < 0 || delta1 < 0));
-        } else if (data.params.liquidityDelta > 0) {
-            assert(delta0 < 0 || delta1 < 0);
-            assert(!(delta0 > 0 || delta1 > 0));
-        }
+        // only because of this we had to copy the whole file from https://github.com/Uniswap/v4-core/blob/main/src/test/PoolModifyLiquidityTest.sol
+        // because of fees accrued, when liquidity is being removed, delta can still be negative (fees make up for it)
+
+        //  if (data.params.liquidityDelta < 0) {
+        //     assert(delta0 > 0 || delta1 > 0);
+        //     assert(!(delta0 < 0 || delta1 < 0));
+        // } else if (data.params.liquidityDelta > 0) {
+        //     assert(delta0 < 0 || delta1 < 0);
+        //     assert(!(delta0 > 0 || delta1 > 0));
+        // }
 
         if (delta0 < 0) data.key.currency0.settle(manager, data.sender, uint256(-delta0), data.settleUsingBurn);
         if (delta1 < 0) data.key.currency1.settle(manager, data.sender, uint256(-delta1), data.settleUsingBurn);

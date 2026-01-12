@@ -124,6 +124,7 @@ contract Handler is YieldHarvestingHookTest {
         actorPositions[currentActor].push(PositionInfo({tickLower: params.tickLower, tickUpper: params.tickUpper}));
     }
 
+    // no clamping
     function directMintUnderlyingVault(address underlyingVault, uint256 amount) internal {
         address underlyingAsset = IERC4626(underlyingVault).asset();
         uint256 underlyingAssetsNeeded = IERC4626(underlyingVault).previewMint(amount);
@@ -134,6 +135,7 @@ contract Handler is YieldHarvestingHookTest {
         IERC4626(underlyingVault).mint(amount, currentActor);
     }
 
+    // no clamping
     function directMintVaultWrapper(address vaultWrapper, uint256 amount) internal {
         address underlyingVault = IERC4626(vaultWrapper).asset();
         uint256 underlyingVaultSharesNeeded = IERC4626(vaultWrapper).previewMint(amount);
@@ -142,6 +144,58 @@ contract Handler is YieldHarvestingHookTest {
 
         IERC20(underlyingVault).approve(vaultWrapper, underlyingVaultSharesNeeded);
         IERC4626(vaultWrapper).mint(amount, currentActor);
+    }
+
+    function directDepositUnderlyingVault(address underlyingVault, uint256 amount) internal {
+        address underlyingAsset = IERC4626(underlyingVault).asset();
+
+        // we do this to avoid ZERO_ASSETS error in case amount is very small
+        uint256 assetsRequiredToMint1Share = IERC4626(underlyingVault).previewMint(1);
+        amount = amount < assetsRequiredToMint1Share ? assetsRequiredToMint1Share : amount;
+
+        MockERC20(underlyingAsset).mint(currentActor, amount);
+        IERC20(underlyingAsset).approve(underlyingVault, amount);
+
+        IERC4626(underlyingVault).deposit(amount, currentActor);
+    }
+
+    function directDepositVaultWrapper(address vaultWrapper, uint256 amount) internal {
+        address underlyingVault = IERC4626(vaultWrapper).asset();
+        uint256 underlyingVaultSharesNeeded = IERC4626(vaultWrapper).previewDeposit(amount);
+
+        directMintUnderlyingVault(underlyingVault, underlyingVaultSharesNeeded);
+
+        IERC20(underlyingVault).approve(vaultWrapper, underlyingVaultSharesNeeded);
+        IERC4626(vaultWrapper).deposit(amount, currentActor);
+    }
+
+    // it has the clamping logic enabled
+    function withdrawFromERC4626Vault(IERC4626 vault, uint256 amount) internal {
+        uint256 maxWithdrawable = vault.maxWithdraw(currentActor);
+        amount = bound(amount, 0, maxWithdrawable);
+
+        uint256 expectedSharesToBurn = vault.previewWithdraw(amount);
+        uint256 sharesBalanceBefore = vault.balanceOf(currentActor);
+
+        vault.withdraw(amount, currentActor, currentActor);
+
+        assertEq(vault.balanceOf(currentActor), sharesBalanceBefore - expectedSharesToBurn);
+    }
+
+    function redeemFromERC4626Vault(IERC4626 vault, uint256 amount) internal {
+        amount = bound(amount, 0, vault.balanceOf(currentActor));
+
+        //avoid ZERO_ASSETS error
+        if (amount == 0) {
+            return;
+        }
+
+        uint256 expectedAssetsToReceive = vault.previewRedeem(amount);
+        uint256 assetBalanceBefore = IERC20(vault.asset()).balanceOf(currentActor);
+
+        vault.redeem(amount, currentActor, currentActor);
+
+        assertEq(IERC20(vault.asset()).balanceOf(currentActor), assetBalanceBefore + expectedAssetsToReceive);
     }
 
     function removeLiquidity(uint256 actorIndexSeed, uint256 positionIndexSeed, uint256 liquidityToRemove)
@@ -174,27 +228,98 @@ contract Handler is YieldHarvestingHookTest {
         modifyLiquidityRouter.modifyLiquidity(poolKey, params, "", false, false);
     }
 
+    //TODO: add swaps as well
     function swap() external {}
 
-    function directMintVaultWrapper(uint256 actorIndexSeed, uint256 amount) external useActor(actorIndexSeed) {
+    function mintIntoVaultWrapper(uint256 actorIndexSeed, bool isVaultWrapper0, uint256 amount)
+        external
+        useActor(actorIndexSeed)
+    {
         amount = bound(amount, 1, type(uint128).max / 2);
-        directMintVaultWrapper(address(vaultWrapper0), amount);
+        directMintVaultWrapper(isVaultWrapper0 ? address(vaultWrapper0) : address(vaultWrapper1), amount);
     }
 
-    function directWithdrawVaultWrapper(uint256 actorIndexSeed, uint256 amount) external useActor(actorIndexSeed) {
-        // we get the max withdrawable amount for the actor
-        uint256 maxWithdrawable = IERC4626(address(vaultWrapper0)).maxWithdraw(address(currentActor));
-        amount = bound(amount, 0, maxWithdrawable);
-        vaultWrapper0.withdraw(amount, currentActor, currentActor);
+    function depositIntoVaultWrapper(uint256 actorIndexSeed, bool isVaultWrapper0, uint256 amount)
+        external
+        useActor(actorIndexSeed)
+    {
+        amount = bound(amount, 1, type(uint128).max / 2);
+        directDepositVaultWrapper(isVaultWrapper0 ? address(vaultWrapper0) : address(vaultWrapper1), amount);
     }
 
-    function directDepositToERC4626Vault() external {}
+    function withdrawFromVaultWrapper(uint256 actorIndexSeed, bool isVaultWrapper0, uint256 amount)
+        external
+        useActor(actorIndexSeed)
+    {
+        IERC4626 vaultWrapper = isVaultWrapper0 ? IERC4626(address(vaultWrapper0)) : IERC4626(address(vaultWrapper1));
+        withdrawFromERC4626Vault(vaultWrapper, amount);
+    }
 
-    function directWithdrawFromERC4626Vault(uint256 actorIndexSeed, uint256 amount) external {}
+    function redeemFromVaultWrapper(uint256 actorIndexSeed, bool isVaultWrapper0, uint256 amount)
+        external
+        useActor(actorIndexSeed)
+    {
+        IERC4626 vaultWrapper = isVaultWrapper0 ? IERC4626(address(vaultWrapper0)) : IERC4626(address(vaultWrapper1));
+        redeemFromERC4626Vault(vaultWrapper, amount);
+    }
 
-    function donateToERC4626Vault() external {}
+    function mintIntoUnderlyingVault(uint256 actorIndexSeed, bool isVault0, uint256 amount)
+        external
+        useActor(actorIndexSeed)
+    {
+        amount = bound(amount, 1, type(uint128).max / 2);
+        directMintUnderlyingVault(isVault0 ? address(underlyingVault0) : address(underlyingVault1), amount);
+    }
 
-    function reportLossForERC4626Vault() external {}
+    function depositIntoUnderlyingVault(uint256 actorIndexSeed, bool isVault0, uint256 amount)
+        external
+        useActor(actorIndexSeed)
+    {
+        amount = bound(amount, 1, type(uint128).max / 2);
+        directDepositUnderlyingVault(isVault0 ? address(underlyingVault0) : address(underlyingVault1), amount);
+    }
 
-    function donateToVaultWrapper() external {}
+    function withdrawFromUnderlyingVault(uint256 actorIndexSeed, bool isVault0, uint256 amount)
+        external
+        useActor(actorIndexSeed)
+    {
+        IERC4626 underlyingVault = isVault0 ? IERC4626(address(underlyingVault0)) : IERC4626(address(underlyingVault1));
+        withdrawFromERC4626Vault(underlyingVault, amount);
+    }
+
+    function redeemFromUnderlyingVault(uint256 actorIndexSeed, bool isVault0, uint256 amount)
+        external
+        useActor(actorIndexSeed)
+    {
+        IERC4626 underlyingVault = isVault0 ? IERC4626(address(underlyingVault0)) : IERC4626(address(underlyingVault1));
+        redeemFromERC4626Vault(underlyingVault, amount);
+    }
+
+    // accrue some yield to the underlying vault by donating underlying assets
+    function donateToUnderlyingVault(bool isVault0, uint256 amount) external {
+        amount = bound(amount, 1, type(uint32).max); // trying be conservative to avoid overflows
+
+        IERC4626 underlyingVault = isVault0 ? IERC4626(address(underlyingVault0)) : IERC4626(address(underlyingVault1));
+        address underlyingAsset = underlyingVault.asset();
+
+        // mint underlying assets and deposit directly into the underlying vault
+        MockERC20(underlyingAsset).mint(address(underlyingVault), amount);
+    }
+
+    //anyone can directly donate underlying vault shares to vault wrappers and it should count as yield as well
+    function donateToVaultWrapper(uint256 actorIndexSeed, bool isVault0, uint256 amount)
+        external
+        useActor(actorIndexSeed)
+    {
+        amount = bound(amount, 1, type(uint32).max); // trying be conservative to avoid overflows
+
+        address underlyingVault = isVault0 ? address(underlyingVault0) : address(underlyingVault1);
+        address vaultWrapper = isVault0 ? address(vaultWrapper0) : address(vaultWrapper1);
+
+        directMintUnderlyingVault(underlyingVault, amount);
+
+        IERC20(underlyingVault).transfer(vaultWrapper, amount);
+    }
+
+    // TODO: add handlers to realize loss in a vault
 }
