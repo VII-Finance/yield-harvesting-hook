@@ -31,13 +31,14 @@ contract Invariants is Test {
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
         targetContract(address(handler));
     }
-    
+
     function checkVaultWrapperSolvency(IERC4626 vaultWrapper) internal view {
         IERC4626 underlyingVault = IERC4626(vaultWrapper.asset());
         assertLe(
             vaultWrapper.totalSupply(), underlyingVault.previewRedeem(underlyingVault.balanceOf(address(vaultWrapper)))
         );
     }
+
     // total supply of vault wrappers should always be less than the worth of underlying vault share balance in asset terms
     function invariant_check_solvency() public view {
         checkVaultWrapperSolvency(IERC4626(address(handler.vaultWrapper0())));
