@@ -23,6 +23,8 @@ contract ERC4626VaultWrapperFactory is Ownable {
     address public immutable vaultWrapperImplementation;
     address public immutable aaveWrapperImplementation;
 
+    error CannotUseVaultWrapperAsAsset();
+
     constructor(address _owner, IPoolManager _manager, address _yieldHarvestingHook) Ownable(_owner) {
         poolManager = _manager;
         yieldHarvestingHook = _yieldHarvestingHook;
@@ -94,6 +96,7 @@ contract ERC4626VaultWrapperFactory is Ownable {
         int24 tickSpacing,
         uint160 sqrtPriceX96
     ) external returns (ERC4626VaultWrapper vaultWrapper) {
+        if (_isVaultWrapper(assetB)) revert CannotUseVaultWrapperAsAsset();
         vaultWrapper = ERC4626VaultWrapper(
             _deployVaultWrapper(
                 vaultWrapperImplementation,
@@ -133,6 +136,7 @@ contract ERC4626VaultWrapperFactory is Ownable {
         external
         returns (AaveWrapper aaveWrapper)
     {
+        if (_isVaultWrapper(asset)) revert CannotUseVaultWrapperAsAsset();
         aaveWrapper = AaveWrapper(
             _deployVaultWrapper(aaveWrapperImplementation, aToken, _generateSalt(aToken, asset, fee, tickSpacing))
         );
@@ -220,6 +224,18 @@ contract ERC4626VaultWrapperFactory is Ownable {
             _predictVaultWrapperAddress(aaveWrapperImplementation, aTokenB, aTokenA, fee, tickSpacing);
 
         return _buildPoolKey(aaveWrapperA, aaveWrapperB, fee, tickSpacing);
+    }
+
+    /// @notice Check if an address is a vault wrapper by attempting to call getFactory()
+    function _isVaultWrapper(address token) internal view returns (bool) {
+        if (token == address(0)) return false;
+
+        // if token has no code then this will fail
+        try BaseVaultWrapper(token).getFactory() returns (address factory) {
+            return factory == address(this);
+        } catch {
+            return false;
+        }
     }
 
     function _predictVaultWrapperAddress(
