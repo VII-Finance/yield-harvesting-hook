@@ -23,6 +23,8 @@ interface IPositionManagerExtended is IPositionManager {
 /// @dev This doesn't support aave vaults. Only vault wrappers that have underlying vaults that support ERC4626 interface are supported.
 /// @dev This contract will have approvals of the Liquidity Positions NFTs. We only care about bugs that lead to loss of NFTs here.
 ///      Otherwise it is up to the user to make sure this contract doesn't hold any funds.
+/// TODO: Right now, when we call SWEEP, if it is vault wrappers, user is getting the raw vault wrappers.
+/// We need to take those and convert them back into the raw assets if specified. (Do it in case of L2. Do not do it if it is mainnet)
 contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
@@ -54,7 +56,7 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
         uint128 amount0Max,
         uint128 amount1Max,
         bytes calldata hookData
-    ) internal returns (PoolKey memory, uint128, uint128) {
+    ) internal returns (PoolKey memory) {
         (IERC4626 vaultWrapper0, IERC4626 vaultWrapper1) = hookData.length == 0
             ? (IERC4626(address(0)), IERC4626(address(0)))
             : abi.decode(hookData, (IERC4626, IERC4626));
@@ -114,10 +116,9 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
         //currencies might be out of order at this point, so we need to sort them
         if (Currency.unwrap(poolKey.currency0) > Currency.unwrap(poolKey.currency1)) {
             (poolKey.currency0, poolKey.currency1) = (poolKey.currency1, poolKey.currency0);
-            (amount0Max, amount1Max) = (amount1Max, amount0Max);
         }
 
-        return (poolKey, amount0Max, amount1Max);
+        return poolKey;
     }
 
     function _callModifyLiquidity(
@@ -156,7 +157,7 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
     ) external payable returns (uint256 tokenId) {
         tokenId = positionManager.nextTokenId();
 
-        (poolKey, amount0Max, amount1Max) = _pullAndConvertAssets(poolKey, amount0Max, amount1Max, hookData);
+        poolKey = _pullAndConvertAssets(poolKey, amount0Max, amount1Max, hookData);
 
         bytes memory actionData =
             abi.encode(poolKey, tickLower, tickUpper, liquidity, amount0Max, amount1Max, owner, "");
@@ -172,7 +173,7 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
         uint128 amount1Max,
         bytes calldata hookData
     ) external payable onlyOwnerOf(tokenId) {
-        (poolKey, amount0Max, amount1Max) = _pullAndConvertAssets(poolKey, amount0Max, amount1Max, hookData);
+        poolKey = _pullAndConvertAssets(poolKey, amount0Max, amount1Max, hookData);
 
         bytes memory actionData = abi.encode(tokenId, liquidity, amount0Max, amount1Max, "");
         _callModifyLiquidity(uint8(Actions.INCREASE_LIQUIDITY), actionData, poolKey);
@@ -257,4 +258,6 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
     ) external {
         decreaseLiquidity(poolKey, tokenId, 0, amount0Min, amount1Min, recipient, hookData);
     }
+
+    receive() external payable {}
 }
