@@ -64,6 +64,14 @@ contract ERC4626VaultWrapperFactoryTest is Test {
 
     event PoolInitialized(PoolKey key, uint160 sqrtPriceX96, int24 tick);
 
+    enum PoolType {
+        VAULT_TO_VAULT,
+        VAULT_TO_TOKEN,
+        ATOKEN_TO_VAULT,
+        ATOKEN_TO_ATOKEN,
+        ATOKEN_TO_TOKEN
+    }
+
     function setUp() public {
         poolManager = new PoolManager(poolManagerOwner);
 
@@ -205,7 +213,7 @@ contract ERC4626VaultWrapperFactoryTest is Test {
     }
 
     function testPredictVaultWrapperAddress() public {
-        bytes32 salt = _generateSalt(address(vaultA), address(vaultB), FEE, TICK_SPACING);
+        bytes32 salt = _generateSalt(address(vaultA), address(vaultB), FEE, TICK_SPACING, PoolType.VAULT_TO_VAULT);
 
         address predicted = LibClone.predictDeterministicAddress(
             factory.vaultWrapperImplementation(),
@@ -222,7 +230,7 @@ contract ERC4626VaultWrapperFactoryTest is Test {
     }
 
     function testPredictAaveWrapperAddress() public {
-        bytes32 salt = _generateSalt(address(aTokenA), address(vaultA), FEE, TICK_SPACING);
+        bytes32 salt = _generateSalt(address(aTokenA), address(vaultA), FEE, TICK_SPACING, PoolType.ATOKEN_TO_VAULT);
 
         address predicted = LibClone.predictDeterministicAddress(
             factory.aaveWrapperImplementation(),
@@ -239,7 +247,7 @@ contract ERC4626VaultWrapperFactoryTest is Test {
     }
 
     function testPredictMultipleWrapperAddresses() public {
-        bytes32 vaultSalt = _generateSalt(address(vaultA), address(tokenA), FEE, TICK_SPACING);
+        bytes32 vaultSalt = _generateSalt(address(vaultA), address(tokenA), FEE, TICK_SPACING, PoolType.VAULT_TO_TOKEN);
         address predictedVault = LibClone.predictDeterministicAddress(
             factory.vaultWrapperImplementation(),
             _generateImmutableArgsForVaultWrapper(address(vaultA)),
@@ -247,7 +255,7 @@ contract ERC4626VaultWrapperFactoryTest is Test {
             address(factory)
         );
 
-        bytes32 aaveSalt = _generateSalt(address(aTokenA), address(tokenB), FEE, TICK_SPACING);
+        bytes32 aaveSalt = _generateSalt(address(aTokenA), address(tokenB), FEE, TICK_SPACING, PoolType.ATOKEN_TO_TOKEN);
         address predictedAave = LibClone.predictDeterministicAddress(
             factory.aaveWrapperImplementation(),
             _generateImmutableArgsForAaveWrapper(address(aTokenA)),
@@ -375,12 +383,12 @@ contract ERC4626VaultWrapperFactoryTest is Test {
         factory.createAavePool(address(aTokenB), address(aTokenA), FEE, TICK_SPACING, SQRT_PRICE_X96);
     }
 
-    function _generateSalt(address token0, address token1, uint24 fee, int24 tickSpacing)
+    function _generateSalt(address token0, address token1, uint24 fee, int24 tickSpacing, PoolType poolType)
         internal
         pure
         returns (bytes32)
     {
-        return keccak256(abi.encodePacked(token0, token1, fee, tickSpacing));
+        return keccak256(abi.encodePacked(token0, token1, fee, tickSpacing, poolType));
     }
 
     function _generateImmutableArgsForVaultWrapper(address vault) internal view returns (bytes memory) {
