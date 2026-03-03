@@ -106,6 +106,8 @@ contract YieldHarvestingHook is BaseHook {
     }
 
     function _getPendingYield(Currency currency) internal view returns (uint256) {
+        if (currency.isAddressZero()) return 0;
+
         IVaultWrapper vaultWrapper = _currencyToVaultWrapper(currency);
 
         try vaultWrapper.pendingYield() returns (uint256 pendingYield, uint256) {

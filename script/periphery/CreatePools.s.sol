@@ -28,7 +28,7 @@ contract CreatePoolsScript is Script {
     YieldHarvestingHook yieldHarvestingHook = YieldHarvestingHook(0x777ef319C338C6ffE32A2283F603db603E8F2A80);
     AssetToAssetSwapHookForERC4626 assetToAssetSwapHook =
         AssetToAssetSwapHookForERC4626(0x604E6C45FEe7D7634865603c37Ef1695D0f2C888);
-    LiquidityHelper liquidityHelper = LiquidityHelper(0xc6E2e5E10D2793EFdee7A94080f333e653466fb8);
+    LiquidityHelper liquidityHelper = LiquidityHelper(payable(0xc6E2e5E10D2793EFdee7A94080f333e653466fb8));
 
     function _currencyToIERC20(Currency currency) internal pure returns (IERC20) {
         return IERC20(Currency.unwrap(currency));

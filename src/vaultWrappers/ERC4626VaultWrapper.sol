@@ -40,10 +40,6 @@ contract ERC4626VaultWrapper is BaseVaultWrapper {
         return _underlyingVault().convertToShares(shares);
     }
 
-    function maxWithdraw(address owner) public view override returns (uint256) {
-        return convertToAssets(maxRedeem(owner));
-    }
-
     function _underlyingVault() internal view returns (IERC4626) {
         return IERC4626(asset());
     }
