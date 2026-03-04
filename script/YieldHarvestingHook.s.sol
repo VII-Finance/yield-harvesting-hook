@@ -16,7 +16,7 @@ contract YieldHarvestingHookScript is Script {
 
     function run() external {
         address owner = 0x12e74f3C61F6b4d17a9c3Fdb3F42e8f18a8bB394;
-        IPoolManager poolManager = IPoolManager(0x498581fF718922c3f8e6A244956aF099B2652b2b);
+        IPoolManager poolManager = IPoolManager(0x1F98400000000000000000000000000000000004);
 
         (, bytes32 salt) = HookMiner.find(
             CREATE2_DEPLOYER, HOOK_PERMISSIONS, type(YieldHarvestingHook).creationCode, abi.encode(owner, poolManager)

@@ -159,6 +159,10 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
 
         poolKey = _pullAndConvertAssets(poolKey, amount0Max, amount1Max, hookData);
 
+        // the slippage protection is done via the balance that is transferred to the PositionManager in _pullAndConvertAssets step
+        // The transaction will fail anyway if the sufficient tokens were not provided in _pullAndConvertAssets
+        (amount0Max, amount1Max) = (type(uint128).max, type(uint128).max);
+
         bytes memory actionData =
             abi.encode(poolKey, tickLower, tickUpper, liquidity, amount0Max, amount1Max, owner, "");
 
