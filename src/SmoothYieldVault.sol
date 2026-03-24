@@ -6,6 +6,7 @@ import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.so
 import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {ERC4626} from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/ERC4626.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 
 /// @title SmoothYieldVault
 /// @notice ERC4626 vault that smooths yield distribution over time for yield generating rebasing tokens instead of immediate distribution
@@ -13,7 +14,7 @@ import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 /// The lending protocols do that by design (distribute interest every second), but for rebasing tokens like stETH, yield is distributed immediately every 24 hours (or so)
 /// If yield is distributed immediately, users can add liquidity in the DEX right before the yield is harvested and remove liquidity right after, capturing all of the yield without providing real liquidity
 /// By smoothing yield distribution over time, users providing liquidity will receive yield proportional to the time they provided liquidity
-contract SmoothYieldVault is Ownable, ERC4626 {
+contract SmoothYieldVault is Ownable, ERC4626, ReentrancyGuard {
     /// @notice Last synced asset balance
     uint256 public lastSyncedBalance;
     /// @notice Timestamp of last sync
@@ -114,11 +115,21 @@ contract SmoothYieldVault is Ownable, ERC4626 {
         _;
     }
 
-    function deposit(uint256 assets, address receiver) public override syncBeforeAction returns (uint256 shares) {
+    function deposit(uint256 assets, address receiver) 
+      public 
+      override 
+      syncBeforeAction 
+      nonReentrant 
+    returns (uint256 shares) {
         return super.deposit(assets, receiver);
     }
 
-    function mint(uint256 shares, address receiver) public override syncBeforeAction returns (uint256 assets) {
+    function mint(uint256 shares, address receiver) 
+      public 
+      override 
+      syncBeforeAction 
+      nonReentrant 
+    returns (uint256 assets) {
         return super.mint(shares, receiver);
     }
 
@@ -126,6 +137,7 @@ contract SmoothYieldVault is Ownable, ERC4626 {
         public
         override
         syncBeforeAction
+        nonReentrant
         returns (uint256 shares)
     {
         return super.withdraw(assets, receiver, owner);
@@ -135,6 +147,7 @@ contract SmoothYieldVault is Ownable, ERC4626 {
         public
         override
         syncBeforeAction
+        nonReentrant
         returns (uint256 assets)
     {
         return super.redeem(shares, receiver, owner);
