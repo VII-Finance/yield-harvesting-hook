@@ -37,14 +37,14 @@ contract PeripheryContractsScript is Script {
         );
         vm.startBroadcast();
 
-        // AssetToAssetSwapHookForERC4626 assetToAssetSwapHook =
-        //     new AssetToAssetSwapHookForERC4626{salt: assetToAssetSalt}(poolManager, yieldHarvestingHook, owner);
+        AssetToAssetSwapHookForERC4626 assetToAssetSwapHook =
+            new AssetToAssetSwapHookForERC4626{salt: assetToAssetSalt}(poolManager, yieldHarvestingHook, owner);
 
         // AssetToAssetSwapHookForERC4626 assetToAssetSwapHook =
         //     AssetToAssetSwapHookForERC4626(0x604E6C45FEe7D7634865603c37Ef1695D0f2C888);
 
         // Deploy LiquidityHelper
-        LiquidityHelper liquidityHelper = new LiquidityHelper(evc, positionManager, yieldHarvestingHook);
+        // LiquidityHelper liquidityHelper = new LiquidityHelper(evc, positionManager, yieldHarvestingHook);
 
         // PoolKey memory poolKey = PoolKey({
         //     currency0: Currency.wrap(0x078D782b760474a361dDA0AF3839290b0EF57AD6), // USDC

@@ -135,7 +135,8 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelp
             (vaultWrapperForCurrency0, vaultWrapperForCurrency1) = abi.decode(hookData, (IERC4626, IERC4626));
         } else {
             VaultWrappers memory defaultVaultWrappersSetByOwner = defaultVaultWrappers[key.toId()];
-            (vaultWrapperForCurrency0, vaultWrapperForCurrency1) = (
+            (vaultWrapperForCurrency0, vaultWrapperForCurrency1) =
+            (
                 defaultVaultWrappersSetByOwner.vaultWrapperForCurrency0,
                 defaultVaultWrappersSetByOwner.vaultWrapperForCurrency1
             );
@@ -311,8 +312,9 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelp
         poolManager.sync(Currency.wrap(address(asset)));
         if (address(vaultWrapper) != address(asset)) {
             poolManager.take(Currency.wrap(address(vaultWrapper)), address(this), vaultWrapperAmount);
-            assetAmount =
-                _redeem(vaultWrapper, address(underlyingVault), address(this), vaultWrapperAmount, address(poolManager));
+            assetAmount = _redeem(
+                vaultWrapper, address(underlyingVault), address(this), vaultWrapperAmount, address(poolManager)
+            );
         } else {
             assetAmount = vaultWrapperAmount;
         }
@@ -353,11 +355,7 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelp
         if (address(vaultWrapper) != address(asset)) {
             poolManager.take(Currency.wrap(address(vaultWrapper)), address(this), vaultWrapperSharesNeeded);
             _redeem(
-                vaultWrapper,
-                address(underlyingVault),
-                address(this),
-                vaultWrapperSharesNeeded,
-                address(poolManager)
+                vaultWrapper, address(underlyingVault), address(this), vaultWrapperSharesNeeded, address(poolManager)
             );
         }
         poolManager.settle();
@@ -372,8 +370,7 @@ contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelp
         //address(0) if we expect currency itself to be used without any vaultWrappers
         PoolId assetsPoolId = assetsPoolKey.toId();
         defaultVaultWrappers[assetsPoolId] = VaultWrappers({
-            vaultWrapperForCurrency0: vaultWrapperForCurrency0,
-            vaultWrapperForCurrency1: vaultWrapperForCurrency1
+            vaultWrapperForCurrency0: vaultWrapperForCurrency0, vaultWrapperForCurrency1: vaultWrapperForCurrency1
         });
 
         emit DefaultVaultWrappersSet(
