@@ -432,11 +432,12 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
                 mixedVaultWrapper.approve(address(modifyLiquidityRouter), type(uint256).max);
                 rawAsset.approve(address(modifyLiquidityRouter), type(uint256).max);
             } else {
-                deal(address(rawAsset), address(this), amount0);
-
                 uint256 vaultShares = _deposit(mixedVault, amount1, address(this));
                 mixedVault.approve(address(mixedVaultWrapper), vaultShares);
                 mixedVaultWrapper.deposit(vaultShares, address(this));
+
+                // deal rawAsset AFTER _deposit to avoid overwriting if rawAsset == vault.asset()
+                deal(address(rawAsset), address(this), amount0);
 
                 rawAsset.approve(address(modifyLiquidityRouter), type(uint256).max);
                 mixedVaultWrapper.approve(address(modifyLiquidityRouter), type(uint256).max);

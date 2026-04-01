@@ -8,6 +8,8 @@ solc = "0.8.26"
 evm_version = "cancun"
 bytecode_hash = "none"
 cbor_metadata = false
+no_match_contract = "MorphoVaultsTest"
+
 
 [fuzz]
 runs = 10_000
