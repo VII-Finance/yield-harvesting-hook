@@ -150,21 +150,7 @@ contract AssetToAssetSwapHookForkTest is Test {
         assetToAssetSwapHook.setDefaultVaultWrappers(assetsPoolKey, associatedVault0, associatedVault1);
     }
 
-    function addWarmLiquidity() public {
-        deal(address(asset0), address(this), 1e6);
-        deal(address(asset1), address(this), 1e6);
-
-        asset0.approve(address(assetToAssetSwapHook), type(uint256).max);
-        asset1.approve(address(assetToAssetSwapHook), type(uint256).max);
-
-        assetToAssetSwapHook.addWarmLiquidity(vaultWrapper0, 1e6);
-        assetToAssetSwapHook.addWarmLiquidity(vaultWrapper1, 1e6);
-    }
-
-    function test_assetsSwapExactAmountIn(uint256 amountIn, bool zeroForOne, bool shouldHaveWarmLiquidity) public {
-        if (shouldHaveWarmLiquidity) {
-            addWarmLiquidity();
-        }
+    function test_assetsSwapExactAmountIn(uint256 amountIn, bool zeroForOne) public {
         amountIn = bound(amountIn, 10, 1e6);
 
         Currency currencyIn = zeroForOne ? assetsPoolKey.currency0 : assetsPoolKey.currency1;
@@ -202,10 +188,7 @@ contract AssetToAssetSwapHookForkTest is Test {
         assertEq(assetOut, currencyOut.balanceOf(address(this)) - assetBalanceBefore, "Incorrect asset out amount");
     }
 
-    function test_assetsSwapExactAmountOut(uint256 amountOut, bool zeroForOne, bool shouldHaveWarmLiquidity) public {
-        if (shouldHaveWarmLiquidity) {
-            addWarmLiquidity();
-        }
+    function test_assetsSwapExactAmountOut(uint256 amountOut, bool zeroForOne) public {
         amountOut = bound(amountOut, 10, 1e6);
 
         Currency currencyIn = zeroForOne ? assetsPoolKey.currency0 : assetsPoolKey.currency1;
@@ -282,118 +265,6 @@ contract AssetToAssetSwapHookForkTest is Test {
 
         liquidityHelper.decreaseLiquidity(
             poolKey, tokenId, liquidityToAdd, 0, 0, address(this), abi.encode(vaultWrapper0, vaultWrapper1)
-        );
-    }
-
-    function test_addWarmLiquidity(uint256 assetAmount) public {
-        assetAmount = bound(assetAmount, 1e3, 1e8);
-
-        deal(address(asset0), address(this), assetAmount);
-        asset0.approve(address(assetToAssetSwapHook), assetAmount);
-
-        uint256 assetBalanceBefore = asset0.balanceOf(address(this));
-        uint256 vaultWrapper0PoolBalanceBefore =
-            poolManager.balanceOf(address(assetToAssetSwapHook), Currency.wrap(address(vaultWrapper0)).toId());
-        uint256 vaultWrapper0PoolManagerBalanceBefore = vaultWrapper0.balanceOf(address(poolManager));
-        uint256 asset0PoolBalanceBefore =
-            poolManager.balanceOf(address(assetToAssetSwapHook), Currency.wrap(address(asset0)).toId());
-        uint256 asset0PoolManagerBalanceBefore = asset0.balanceOf(address(poolManager));
-        uint256 warmLiquidityBefore = assetToAssetSwapHook.warmLiquidityBalances(address(this), vaultWrapper0);
-
-        uint256 expectedVaultWrapperDifference =
-            vaultWrapper0.previewDeposit(underlyingVault0.previewDeposit(assetAmount / 2));
-
-        assetToAssetSwapHook.addWarmLiquidity(vaultWrapper0, assetAmount);
-
-        assertApproxEqAbs(assetBalanceBefore - asset0.balanceOf(address(this)), assetAmount, 4);
-        assertApproxEqAbs(
-            poolManager.balanceOf(address(assetToAssetSwapHook), Currency.wrap(address(asset0)).toId())
-                - asset0PoolBalanceBefore,
-            assetAmount - assetAmount / 2,
-            4
-        );
-        assertApproxEqAbs(
-            asset0.balanceOf(address(poolManager)) - asset0PoolManagerBalanceBefore, assetAmount - assetAmount / 2, 4
-        );
-        assertApproxEqAbs(
-            poolManager.balanceOf(address(assetToAssetSwapHook), Currency.wrap(address(vaultWrapper0)).toId())
-                - vaultWrapper0PoolBalanceBefore,
-            expectedVaultWrapperDifference,
-            4
-        );
-        assertApproxEqAbs(
-            vaultWrapper0.balanceOf(address(poolManager)) - vaultWrapper0PoolManagerBalanceBefore,
-            expectedVaultWrapperDifference,
-            4
-        );
-        assertApproxEqAbs(
-            assetToAssetSwapHook.warmLiquidityBalances(address(this), vaultWrapper0) - warmLiquidityBefore,
-            assetAmount,
-            4
-        );
-    }
-
-    function test_removeWarmLiquidity(uint256 assetAmount) public {
-        assetAmount = bound(assetAmount, 10, 1e8);
-
-        deal(address(asset0), address(this), assetAmount);
-        asset0.approve(address(assetToAssetSwapHook), assetAmount);
-
-        assetToAssetSwapHook.addWarmLiquidity(vaultWrapper0, assetAmount);
-
-        uint256 assetBalanceBefore = asset0.balanceOf(address(this));
-        uint256 vaultWrapper0PoolBalanceBefore =
-            poolManager.balanceOf(address(assetToAssetSwapHook), Currency.wrap(address(vaultWrapper0)).toId());
-        uint256 vaultWrapper0PoolManagerBalanceBefore = vaultWrapper0.balanceOf(address(poolManager));
-        uint256 asset0PoolBalanceBefore =
-            poolManager.balanceOf(address(assetToAssetSwapHook), Currency.wrap(address(asset0)).toId());
-        uint256 asset0PoolManagerBalanceBefore = asset0.balanceOf(address(poolManager));
-        uint256 warmLiquidityBefore = assetToAssetSwapHook.warmLiquidityBalances(address(this), vaultWrapper0);
-
-        assetToAssetSwapHook.removeWarmLiquidity(vaultWrapper0, assetAmount);
-
-        assertApproxEqAbs(asset0.balanceOf(address(this)) - assetBalanceBefore, assetAmount, 4);
-        assertApproxEqAbs(
-            asset0PoolBalanceBefore
-                - poolManager.balanceOf(address(assetToAssetSwapHook), Currency.wrap(address(asset0)).toId()),
-            assetAmount / 2,
-            4
-        );
-        assertApproxEqAbs(asset0PoolManagerBalanceBefore - asset0.balanceOf(address(poolManager)), assetAmount / 2, 4);
-        assertApproxEqAbs(
-            vaultWrapper0PoolBalanceBefore
-                - poolManager.balanceOf(address(assetToAssetSwapHook), Currency.wrap(address(vaultWrapper0)).toId()),
-            vaultWrapper0.previewWithdraw(underlyingVault0.previewWithdraw(assetAmount / 2)),
-            4
-        );
-        assertApproxEqAbs(
-            vaultWrapper0PoolManagerBalanceBefore - vaultWrapper0.balanceOf(address(poolManager)),
-            vaultWrapper0.previewWithdraw(underlyingVault0.previewWithdraw(assetAmount / 2)),
-            4
-        );
-        assertApproxEqAbs(
-            warmLiquidityBefore - assetToAssetSwapHook.warmLiquidityBalances(address(this), vaultWrapper0),
-            assetAmount,
-            4
-        );
-    }
-
-    function test_rebalance(uint256 amount, bool zeroForOne, bool isExactIn) public {
-        if (isExactIn) test_assetsSwapExactAmountIn(amount, zeroForOne, true);
-        else test_assetsSwapExactAmountOut(amount, zeroForOne, true);
-
-        assetToAssetSwapHook.reBalance(vaultWrapper0);
-        assetToAssetSwapHook.reBalance(vaultWrapper1);
-
-        assertApproxEqAbs(
-            poolManager.balanceOf(address(assetToAssetSwapHook), Currency.wrap(address(vaultWrapper0)).toId()),
-            poolManager.balanceOf(address(assetToAssetSwapHook), Currency.wrap(address(asset0)).toId()),
-            1
-        );
-        assertApproxEqAbs(
-            poolManager.balanceOf(address(assetToAssetSwapHook), Currency.wrap(address(vaultWrapper1)).toId()),
-            poolManager.balanceOf(address(assetToAssetSwapHook), Currency.wrap(address(asset1)).toId()),
-            1
         );
     }
 }

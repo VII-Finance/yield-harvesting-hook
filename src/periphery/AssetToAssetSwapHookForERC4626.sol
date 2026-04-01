@@ -21,23 +21,15 @@ import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 import {IHookEvents} from "src/interfaces/IHookEvents.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-import {Context} from "lib/openzeppelin-contracts/contracts/utils/Context.sol";
 import {BaseAssetToVaultWrapperHelper} from "src/periphery/base/BaseAssetToVaultWrapperHelper.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
-import {IUnlockCallback} from "@uniswap/v4-core/src/interfaces/callback/IUnlockCallback.sol";
 
 /// @notice This contract enables users to interact with pools created using the yield harvesting hook without needing to manually convert assets to or from vault wrappers.
 /// @dev It automates the conversion between ERC20 assets without any special logic, following the flow described in https://github.com/VII-Finance/yield-harvesting-hook/blob/periphery-contracts/docs/swap_flow.md.
 /// @dev Only vault wrappers with underlying vaults that support the ERC4626 interface are supported; Aave vaults are not supported.
 /// @dev hookData should contain two encoded IERC4626 vault wrappers (for token0 and token1 respectively), or address(0) if no vault wrapper is used for that token
 ///      if hookData is not provided then default vault wrappers decided by the hook owner will be used.
-contract AssetToAssetSwapHookForERC4626 is
-    BaseHook,
-    BaseAssetToVaultWrapperHelper,
-    Ownable,
-    IHookEvents,
-    IUnlockCallback
-{
+contract AssetToAssetSwapHookForERC4626 is BaseHook, BaseAssetToVaultWrapperHelper, Ownable, IHookEvents {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
     using SafeCast for int256;
@@ -54,17 +46,10 @@ contract AssetToAssetSwapHookForERC4626 is
     IHooks public immutable yieldHarvestingHook;
 
     mapping(PoolId poolId => VaultWrappers vaultWrappers) public defaultVaultWrappers;
-    mapping(address user => mapping(IERC4626 vaultWrapper => uint256 warmLiquidity)) public warmLiquidityBalances;
-    mapping(IERC4626 vaultWrapper => uint256 totalWarmLiquidity) public totalWarmLiquidity;
 
     event DefaultVaultWrappersSet(
         bytes32 indexed poolId, address indexed vaultWrappers0, address indexed vaultWrapperForCurrency1
     );
-    event WarmLiquidityAdded(address indexed user, IERC4626 indexed vaultWrapper, uint256 assetAmount);
-    event WarmLiquidityRemoved(address indexed user, IERC4626 indexed vaultWrapper, uint256 assetAmount);
-
-    error InsufficientWarmLiquidity(uint256 requested, uint256 available);
-    error ZeroAmountNotAllowed();
 
     constructor(IPoolManager _poolManager, IHooks _yieldHarvestingHook, address _initialOwner)
         BaseHook(_poolManager)
@@ -150,8 +135,7 @@ contract AssetToAssetSwapHookForERC4626 is
             (vaultWrapperForCurrency0, vaultWrapperForCurrency1) = abi.decode(hookData, (IERC4626, IERC4626));
         } else {
             VaultWrappers memory defaultVaultWrappersSetByOwner = defaultVaultWrappers[key.toId()];
-            (vaultWrapperForCurrency0, vaultWrapperForCurrency1) =
-            (
+            (vaultWrapperForCurrency0, vaultWrapperForCurrency1) = (
                 defaultVaultWrappersSetByOwner.vaultWrapperForCurrency0,
                 defaultVaultWrappersSetByOwner.vaultWrapperForCurrency1
             );
@@ -284,19 +268,10 @@ contract AssetToAssetSwapHookForERC4626 is
     ) private returns (uint256 vaultWrapperShares) {
         poolManager.sync(Currency.wrap(address(vaultWrapper)));
         if (address(vaultWrapper) != address(asset)) {
-            vaultWrapperShares = vaultWrapper.previewDeposit(underlyingVault.previewDeposit(assetAmount));
-            //if this address has sufficient claims from warmLiquidity then skip the deposit
-            if (vaultWrapperShares > poolManager.balanceOf(address(this), Currency.wrap(address(vaultWrapper)).toId()))
-            {
-                poolManager.take(Currency.wrap(address(asset)), address(this), assetAmount);
-                vaultWrapperShares = _deposit(
-                    vaultWrapper, address(underlyingVault), asset, address(this), assetAmount, address(poolManager)
-                );
-            } else {
-                //burn the claims
-                poolManager.burn(address(this), Currency.wrap(address(vaultWrapper)).toId(), vaultWrapperShares);
-                poolManager.mint(address(this), Currency.wrap(address(asset)).toId(), assetAmount);
-            }
+            poolManager.take(Currency.wrap(address(asset)), address(this), assetAmount);
+            vaultWrapperShares = _deposit(
+                vaultWrapper, address(underlyingVault), asset, address(this), assetAmount, address(poolManager)
+            );
         } else {
             vaultWrapperShares = assetAmount;
         }
@@ -335,18 +310,9 @@ contract AssetToAssetSwapHookForERC4626 is
     ) private returns (uint256 assetAmount) {
         poolManager.sync(Currency.wrap(address(asset)));
         if (address(vaultWrapper) != address(asset)) {
-            assetAmount = underlyingVault.previewRedeem(vaultWrapper.previewRedeem(vaultWrapperAmount));
-            //if this address has sufficient claims from warmLiquidity then skip the redeem
-            if (assetAmount > poolManager.balanceOf(address(this), Currency.wrap(address(asset)).toId())) {
-                poolManager.take(Currency.wrap(address(vaultWrapper)), address(this), vaultWrapperAmount);
-                assetAmount = _redeem(
-                    vaultWrapper, address(underlyingVault), address(this), vaultWrapperAmount, address(poolManager)
-                );
-            } else {
-                //directly burn the claims from this address
-                poolManager.burn(address(this), Currency.wrap(address(asset)).toId(), assetAmount);
-                poolManager.mint(address(this), Currency.wrap(address(vaultWrapper)).toId(), vaultWrapperAmount);
-            }
+            poolManager.take(Currency.wrap(address(vaultWrapper)), address(this), vaultWrapperAmount);
+            assetAmount =
+                _redeem(vaultWrapper, address(underlyingVault), address(this), vaultWrapperAmount, address(poolManager));
         } else {
             assetAmount = vaultWrapperAmount;
         }
@@ -363,25 +329,11 @@ contract AssetToAssetSwapHookForERC4626 is
         poolManager.sync(Currency.wrap(address(vaultWrapper)));
 
         if (address(asset) != address(vaultWrapper)) {
-            //if this address has sufficient claims from warmLiquidity then skip the mint
             assetAmount = underlyingVault.previewMint(vaultWrapper.previewMint(vaultWrapperAmount));
-
-            if (vaultWrapperAmount > poolManager.balanceOf(address(this), Currency.wrap(address(vaultWrapper)).toId()))
-            {
-                poolManager.take(Currency.wrap(address(asset)), address(this), assetAmount);
-                assetAmount = _mint(
-                    vaultWrapper,
-                    address(underlyingVault),
-                    asset,
-                    address(this),
-                    vaultWrapperAmount,
-                    address(poolManager)
-                );
-            } else {
-                //burn the claims
-                poolManager.burn(address(this), Currency.wrap(address(vaultWrapper)).toId(), vaultWrapperAmount);
-                poolManager.mint(address(this), Currency.wrap(address(asset)).toId(), assetAmount);
-            }
+            poolManager.take(Currency.wrap(address(asset)), address(this), assetAmount);
+            assetAmount = _mint(
+                vaultWrapper, address(underlyingVault), asset, address(this), vaultWrapperAmount, address(poolManager)
+            );
         } else {
             assetAmount = vaultWrapperAmount;
         }
@@ -394,26 +346,20 @@ contract AssetToAssetSwapHookForERC4626 is
         IERC4626 underlyingVault,
         IERC20 asset,
         uint256 vaultWrapperSharesNeeded,
-        uint256 amountOut
+        uint256 /* amountOut */
     ) private {
         poolManager.sync(Currency.wrap(address(asset)));
 
         if (address(vaultWrapper) != address(asset)) {
-            if (amountOut > poolManager.balanceOf(address(this), Currency.wrap(address(asset)).toId())) {
-                poolManager.take(Currency.wrap(address(vaultWrapper)), address(this), vaultWrapperSharesNeeded);
-                _redeem(
-                    vaultWrapper,
-                    address(underlyingVault),
-                    address(this),
-                    vaultWrapperSharesNeeded,
-                    address(poolManager)
-                );
-            } else {
-                //burn the claims
-                poolManager.burn(address(this), Currency.wrap(address(asset)).toId(), amountOut);
-                poolManager.mint(address(this), Currency.wrap(address(vaultWrapper)).toId(), vaultWrapperSharesNeeded);
-            }
-        } else {}
+            poolManager.take(Currency.wrap(address(vaultWrapper)), address(this), vaultWrapperSharesNeeded);
+            _redeem(
+                vaultWrapper,
+                address(underlyingVault),
+                address(this),
+                vaultWrapperSharesNeeded,
+                address(poolManager)
+            );
+        }
         poolManager.settle();
     }
 
@@ -426,131 +372,13 @@ contract AssetToAssetSwapHookForERC4626 is
         //address(0) if we expect currency itself to be used without any vaultWrappers
         PoolId assetsPoolId = assetsPoolKey.toId();
         defaultVaultWrappers[assetsPoolId] = VaultWrappers({
-            vaultWrapperForCurrency0: vaultWrapperForCurrency0, vaultWrapperForCurrency1: vaultWrapperForCurrency1
+            vaultWrapperForCurrency0: vaultWrapperForCurrency0,
+            vaultWrapperForCurrency1: vaultWrapperForCurrency1
         });
 
         emit DefaultVaultWrappersSet(
             PoolId.unwrap(assetsPoolId), address(vaultWrapperForCurrency0), address(vaultWrapperForCurrency1)
         );
-    }
-
-    function unlockCallback(bytes calldata data) external onlyPoolManager returns (bytes memory) {
-        (address user, bool isAddWarmLiquidity, IERC4626 vaultWrapper, uint256 assetAmount) =
-            abi.decode(data, (address, bool, IERC4626, uint256));
-
-        IERC4626 underlyingVault = IERC4626(vaultWrapper.asset());
-        IERC20 asset = IERC20(underlyingVault.asset());
-
-        if (isAddWarmLiquidity) {
-            if (assetAmount > 0) _addWarmLiquidity(user, vaultWrapper, underlyingVault, asset, assetAmount);
-            else _rebalance(vaultWrapper, underlyingVault, asset);
-        } else {
-            _removeWarmLiquidity(user, vaultWrapper, underlyingVault, asset, assetAmount);
-        }
-    }
-
-    //the amount when adding means the assets but when removing means the vaultWrapper shares
-    function _addWarmLiquidity(
-        address user,
-        IERC4626 vaultWrapper,
-        IERC4626 underlyingVault,
-        IERC20 asset,
-        uint256 assetAmount
-    ) internal {
-        SafeERC20.safeTransferFrom(asset, user, address(this), assetAmount);
-
-        poolManager.sync(Currency.wrap(address(vaultWrapper)));
-        uint256 assetsSpent =
-            _mint(vaultWrapper, address(underlyingVault), asset, address(this), assetAmount / 2, address(poolManager));
-        poolManager.mint(address(this), Currency.wrap(address(vaultWrapper)).toId(), assetAmount / 2);
-        poolManager.settle();
-
-        poolManager.sync(Currency.wrap(address(asset)));
-        poolManager.mint(address(this), Currency.wrap(address(asset)).toId(), assetAmount - assetsSpent);
-        SafeERC20.safeTransfer(asset, address(poolManager), assetAmount - assetsSpent);
-        poolManager.settle();
-
-        warmLiquidityBalances[user][vaultWrapper] += assetAmount;
-        totalWarmLiquidity[vaultWrapper] += assetAmount;
-
-        emit WarmLiquidityAdded(user, vaultWrapper, assetAmount);
-    }
-
-    function _removeWarmLiquidity(
-        address user,
-        IERC4626 vaultWrapper,
-        IERC4626 underlyingVault,
-        IERC20 asset,
-        uint256 assetAmount
-    ) internal {
-        uint256 userWarmLiquidity = warmLiquidityBalances[user][vaultWrapper];
-        if (userWarmLiquidity < assetAmount) {
-            revert InsufficientWarmLiquidity(assetAmount, userWarmLiquidity);
-        }
-
-        poolManager.take(Currency.wrap(address(vaultWrapper)), address(this), assetAmount / 2);
-        poolManager.burn(address(this), Currency.wrap(address(vaultWrapper)).toId(), assetAmount / 2);
-
-        uint256 assetsReceived = _redeem(vaultWrapper, address(underlyingVault), address(this), assetAmount / 2, user);
-
-        poolManager.take(Currency.wrap(address(asset)), user, assetsReceived);
-        poolManager.burn(address(this), Currency.wrap(address(asset)).toId(), assetsReceived);
-
-        warmLiquidityBalances[user][vaultWrapper] -= assetAmount;
-        totalWarmLiquidity[vaultWrapper] -= assetAmount;
-
-        emit WarmLiquidityRemoved(user, vaultWrapper, assetAmount);
-    }
-
-    function _rebalance(IERC4626 vaultWrapper, IERC4626 underlyingVault, IERC20 asset) internal {
-        uint256 totalWarmLiquidityForVaultWrapper = totalWarmLiquidity[vaultWrapper];
-
-        uint256 currentVaultWrapperBalance =
-            poolManager.balanceOf(address(this), Currency.wrap(address(vaultWrapper)).toId());
-        uint256 desiredVaultWrapperBalance = totalWarmLiquidityForVaultWrapper / 2;
-
-        if (currentVaultWrapperBalance < desiredVaultWrapperBalance) {
-            //need to mint more
-            uint256 vaultWrapperSharesToMint = desiredVaultWrapperBalance - currentVaultWrapperBalance;
-            uint256 assetsNeeded = underlyingVault.previewMint(vaultWrapper.previewMint(vaultWrapperSharesToMint));
-
-            poolManager.take(Currency.wrap(address(asset)), address(this), assetsNeeded);
-            poolManager.burn(address(this), Currency.wrap(address(asset)).toId(), assetsNeeded);
-
-            poolManager.sync(Currency.wrap(address(vaultWrapper)));
-            //here, we use previewMint to give us a very close estimate of shares to mint but we do not rely on it being exact
-            //we simply deposit the assetsNeeded and accept however many shares we get (this will be very close to vaultWrapperSharesToMint)
-            uint256 vaultWrapperSharesMinted = _deposit(
-                vaultWrapper, address(underlyingVault), asset, address(this), assetsNeeded, address(poolManager)
-            );
-            poolManager.mint(address(this), Currency.wrap(address(vaultWrapper)).toId(), vaultWrapperSharesMinted);
-            poolManager.settle();
-        } else {
-            uint256 vaultWrapperSharesToRedeem = currentVaultWrapperBalance - desiredVaultWrapperBalance;
-
-            poolManager.take(Currency.wrap(address(vaultWrapper)), address(this), vaultWrapperSharesToRedeem);
-            poolManager.burn(address(this), Currency.wrap(address(vaultWrapper)).toId(), vaultWrapperSharesToRedeem);
-
-            poolManager.sync(Currency.wrap(address(asset)));
-            uint256 assetsReceived = _redeem(
-                vaultWrapper, address(underlyingVault), address(this), vaultWrapperSharesToRedeem, address(poolManager)
-            );
-            poolManager.mint(address(this), Currency.wrap(address(asset)).toId(), assetsReceived);
-            poolManager.settle();
-        }
-    }
-
-    function addWarmLiquidity(IERC4626 vaultWrapper, uint256 assetAmount) external {
-        if (assetAmount == 0) revert ZeroAmountNotAllowed();
-        poolManager.unlock(abi.encode(_msgSender(), true, vaultWrapper, assetAmount));
-    }
-
-    function removeWarmLiquidity(IERC4626 vaultWrapper, uint256 assetAmount) external {
-        poolManager.unlock(abi.encode(_msgSender(), false, vaultWrapper, assetAmount));
-    }
-
-    function reBalance(IERC4626 vaultWrapper) external {
-        poolManager.unlock(abi.encode(_msgSender(), true, vaultWrapper, 0));
     }
 
     function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
