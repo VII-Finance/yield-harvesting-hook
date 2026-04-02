@@ -32,11 +32,11 @@ contract SmoothYieldVault is Ownable, ERC4626 {
     }
 
     function name() public view override(ERC20, IERC20Metadata) returns (string memory) {
-        return string(bytes.concat("Smoothed Wrapped ", bytes(IERC20Metadata(asset()).name())));
+        return string(bytes.concat("Smoothed Yield ", bytes(IERC20Metadata(asset()).name())));
     }
 
     function symbol() public view override(ERC20, IERC20Metadata) returns (string memory) {
-        return string(bytes.concat("SW-", bytes(IERC20Metadata(asset()).symbol())));
+        return string(bytes.concat("SY-", bytes(IERC20Metadata(asset()).symbol())));
     }
 
     /// @notice Calculate unsmoothed profit since last sync
