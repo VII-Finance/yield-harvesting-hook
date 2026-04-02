@@ -29,11 +29,6 @@ contract UnderlyingAssetsSwapHookFactory {
 
     event UnderlyingAssetsSwapHookCreated(bytes32 indexed poolId, address indexed hook);
 
-    /// @notice Returns the asset pool key for a given vault wrapper pool id.
-    function assetPoolKeyForPool(PoolId poolId) external view returns (PoolKey memory) {
-        return _buildAssetPoolKey(hookForPool[poolId]);
-    }
-
     error InvalidHookAddress(address hook);
     error HookAlreadyExists(address hook);
 
@@ -116,6 +111,16 @@ contract UnderlyingAssetsSwapHookFactory {
 
         (hookAddress, salt) =
             HookMiner.find(address(this), REQUIRED_FLAGS, type(UnderlyingAssetsSwapHook).creationCode, constructorArgs);
+    }
+
+    /// @notice Returns the asset pool key for a given vault wrapper pool id.
+    function assetPoolKeyForPool(PoolId poolId) public view returns (PoolKey memory) {
+        return _buildAssetPoolKey(hookForPool[poolId]);
+    }
+
+    /// @notice Returns the asset pool key for a given vault wrapper pool key.
+    function assetPoolKeyForPool(PoolKey memory vaultWrapperPoolKey) external view returns (PoolKey memory) {
+        return assetPoolKeyForPool(vaultWrapperPoolKey.toId());
     }
 
     /// @notice Predict the hook address for a given pool key and salt without deploying.
