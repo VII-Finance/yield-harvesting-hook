@@ -17,6 +17,7 @@ import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 import {IHookEvents} from "src/interfaces/IHookEvents.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
+import {IAllowanceTransfer} from "lib/v4-periphery/lib/permit2/src/interfaces/IAllowanceTransfer.sol";
 
 /// @notice A simplified version of AssetToAssetSwapHookForERC4626 scoped to a single vault wrapper pair.
 /// @dev Because the vault wrapper addresses are known at construction time, approvals are set once in the
@@ -30,6 +31,8 @@ contract SinglePairAssetSwapHook is BaseHook, IHookEvents {
     using PoolIdLibrary for PoolKey;
 
     uint256 public constant Q96_INVERSE_CONSTANT = 2 ** 192;
+
+    address public constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
 
     address public immutable factory;
 
@@ -97,11 +100,18 @@ contract SinglePairAssetSwapHook is BaseHook, IHookEvents {
             hooks: _yieldHarvestingHook
         });
 
-        // Approve underlying vaults to spend raw assets (deposit/mint path)
+        // Approve raw assets to Permit2, then grant underlying vaults unlimited Permit2 allowance.
+        // Some underlying vaults pull tokens via Permit2 rather than a direct transferFrom.
+        asset0.forceApprove(PERMIT2, type(uint256).max);
+        asset1.forceApprove(PERMIT2, type(uint256).max);
+        IAllowanceTransfer(PERMIT2).approve(address(asset0), address(underlyingVault0), type(uint160).max, type(uint48).max);
+        IAllowanceTransfer(PERMIT2).approve(address(asset1), address(underlyingVault1), type(uint160).max, type(uint48).max);
+
+        // Also keep a direct ERC20 approval so vaults that do a standard transferFrom still work.
         asset0.forceApprove(address(underlyingVault0), type(uint256).max);
         asset1.forceApprove(address(underlyingVault1), type(uint256).max);
 
-        // Approve vault wrappers to spend underlying vault shares (deposit/mint path)
+        // Approve vault wrappers to spend underlying vault shares (standard ERC20, no Permit2 needed here because we know they do not pull using Permit2).
         IERC20(address(underlyingVault0)).forceApprove(address(_vaultWrapper0), type(uint256).max);
         IERC20(address(underlyingVault1)).forceApprove(address(_vaultWrapper1), type(uint256).max);
     }
