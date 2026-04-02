@@ -20,9 +20,8 @@ contract SinglePairAssetSwapHookFactory {
 
     uint160 public constant SQRT_PRICE_1_1 = 79228162514264337593543950336;
 
-    uint160 public constant REQUIRED_FLAGS =
-        uint160(Hooks.BEFORE_INITIALIZE_FLAG) | uint160(Hooks.BEFORE_SWAP_FLAG)
-            | uint160(Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG) | uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG);
+    uint160 public constant REQUIRED_FLAGS = uint160(Hooks.BEFORE_INITIALIZE_FLAG) | uint160(Hooks.BEFORE_SWAP_FLAG)
+        | uint160(Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG) | uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG);
 
     IPoolManager public immutable poolManager;
 
@@ -106,9 +105,8 @@ contract SinglePairAssetSwapHookFactory {
             address(this)
         );
 
-        (hookAddress, salt) = HookMiner.find(
-            address(this), REQUIRED_FLAGS, type(SinglePairAssetSwapHook).creationCode, constructorArgs
-        );
+        (hookAddress, salt) =
+            HookMiner.find(address(this), REQUIRED_FLAGS, type(SinglePairAssetSwapHook).creationCode, constructorArgs);
     }
 
     /// @notice Predict the hook address for a given pool key and salt without deploying.
@@ -126,9 +124,7 @@ contract SinglePairAssetSwapHookFactory {
             address(this)
         );
 
-        bytes32 initCodeHash = keccak256(
-            abi.encodePacked(type(SinglePairAssetSwapHook).creationCode, constructorArgs)
-        );
+        bytes32 initCodeHash = keccak256(abi.encodePacked(type(SinglePairAssetSwapHook).creationCode, constructorArgs));
 
         return address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), address(this), salt, initCodeHash)))));
     }

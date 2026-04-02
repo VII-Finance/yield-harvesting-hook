@@ -117,7 +117,7 @@ contract SmoothYieldVaultTest is Test {
         assertTrue(vault.transfer(address(1), shares));
     }
 
-    function test_name_and_symbol() public {
+    function test_name_and_symbol() public view {
         assertEq(underlying.name(), "ERC20Mock");
         assertEq(underlying.symbol(), "E20M");
         assertEq(vault.name(), "Smoothed Yield ERC20Mock");

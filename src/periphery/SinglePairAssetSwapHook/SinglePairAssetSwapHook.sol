@@ -20,9 +20,12 @@ import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {IAllowanceTransfer} from "lib/v4-periphery/lib/permit2/src/interfaces/IAllowanceTransfer.sol";
 
 /// @notice A simplified version of AssetToAssetSwapHookForERC4626 scoped to a single vault wrapper pair.
-/// @dev Because the vault wrapper addresses are known at construction time, approvals are set once in the
-///      constructor and there is no need for per-transaction approval logic or a SwapContext struct.
+/// @dev Because the vault wrapper addresses are known at construction time, all token approvals (including
+///      Permit2) are set once in the constructor. No per-transaction approval logic or SwapContext needed.
 /// @dev Assumes both vault wrappers have an ERC4626 vault as their underlying asset.
+/// @dev Can only be attached to a pool by the factory that deployed it (enforced via beforeInitialize).
+/// @dev Adding liquidity directly to the asset pool is blocked; liquidity must be added to the underlying
+///      vault wrapper pool via the yield harvesting hook.
 contract SinglePairAssetSwapHook is BaseHook, IHookEvents {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
@@ -49,7 +52,10 @@ contract SinglePairAssetSwapHook is BaseHook, IHookEvents {
     IERC4626 public immutable underlyingVault0;
     IERC4626 public immutable underlyingVault1;
 
-    // ── Raw asset layer (asset of each underlying vault = currency0/currency1) ─
+    // ── Raw asset layer (underlying assets of each underlying vault) ────────────
+    // Note: asset0 corresponds to vaultWrapper0 but is NOT necessarily assetsPoolKey.currency0;
+    // the asset pool sorts currencies by address independently of the vault wrapper ordering.
+    // See isAsset0Currency0 below.
     IERC20 public immutable asset0;
     IERC20 public immutable asset1;
 
@@ -57,9 +63,9 @@ contract SinglePairAssetSwapHook is BaseHook, IHookEvents {
     ///      the correct zeroForOne direction when forwarding the swap to the vault pool.
     bool public immutable isVaultWrapper0LessThanVaultWrapper1;
 
-    /// @dev True when asset0 < asset1 by address, i.e. asset0 == assetsPoolKey.currency0.
-    ///      When false the asset pool currency ordering is the inverse of the vault wrapper ordering,
-    ///      so every zeroForOne from the asset pool must be flipped before selecting a vault wrapper.
+    /// @dev True when address(asset0) < address(asset1), meaning asset0 == assetsPoolKey.currency0.
+    ///      False when the asset pool sorted currencies the other way (asset1 becomes currency0),
+    ///      in which case the asset pool's zeroForOne must be flipped before selecting a vault wrapper.
     bool public immutable isAsset0Currency0;
 
     PoolKey private vaultWrapperPoolKey;
@@ -104,8 +110,10 @@ contract SinglePairAssetSwapHook is BaseHook, IHookEvents {
         // Some underlying vaults pull tokens via Permit2 rather than a direct transferFrom.
         asset0.forceApprove(PERMIT2, type(uint256).max);
         asset1.forceApprove(PERMIT2, type(uint256).max);
-        IAllowanceTransfer(PERMIT2).approve(address(asset0), address(underlyingVault0), type(uint160).max, type(uint48).max);
-        IAllowanceTransfer(PERMIT2).approve(address(asset1), address(underlyingVault1), type(uint160).max, type(uint48).max);
+        IAllowanceTransfer(PERMIT2)
+            .approve(address(asset0), address(underlyingVault0), type(uint160).max, type(uint48).max);
+        IAllowanceTransfer(PERMIT2)
+            .approve(address(asset1), address(underlyingVault1), type(uint160).max, type(uint48).max);
 
         // Also keep a direct ERC20 approval so vaults that do a standard transferFrom still work.
         asset0.forceApprove(address(underlyingVault0), type(uint256).max);
@@ -139,9 +147,11 @@ contract SinglePairAssetSwapHook is BaseHook, IHookEvents {
         uint256 amountOut;
 
         if (isExactInput) {
-            (amountIn, amountOut) = _handleExactInput(hookZeroForOne, vaultPoolZeroForOne, sqrtPriceLimit, params.amountSpecified);
+            (amountIn, amountOut) =
+                _handleExactInput(hookZeroForOne, vaultPoolZeroForOne, sqrtPriceLimit, params.amountSpecified);
         } else {
-            (amountIn, amountOut) = _handleExactOutput(hookZeroForOne, vaultPoolZeroForOne, sqrtPriceLimit, params.amountSpecified);
+            (amountIn, amountOut) =
+                _handleExactOutput(hookZeroForOne, vaultPoolZeroForOne, sqrtPriceLimit, params.amountSpecified);
         }
 
         if (isExactInput) {
@@ -171,10 +181,12 @@ contract SinglePairAssetSwapHook is BaseHook, IHookEvents {
         return (BaseHook.beforeSwap.selector, returnDelta, 0);
     }
 
-    function _handleExactInput(bool zeroForOne, bool vaultPoolZeroForOne, uint160 sqrtPriceLimit, int256 amountSpecified)
-        private
-        returns (uint256 amountIn, uint256 amountOut)
-    {
+    function _handleExactInput(
+        bool zeroForOne,
+        bool vaultPoolZeroForOne,
+        uint160 sqrtPriceLimit,
+        int256 amountSpecified
+    ) private returns (uint256 amountIn, uint256 amountOut) {
         IERC4626 vaultWrapperIn = zeroForOne ? vaultWrapper0 : vaultWrapper1;
         IERC4626 vaultWrapperOut = zeroForOne ? vaultWrapper1 : vaultWrapper0;
         IERC4626 underlyingVaultIn = zeroForOne ? underlyingVault0 : underlyingVault1;
@@ -186,10 +198,12 @@ contract SinglePairAssetSwapHook is BaseHook, IHookEvents {
         amountOut = _redeemFromVaultWrapper(vaultWrapperOut, underlyingVaultOut, sharesOut);
     }
 
-    function _handleExactOutput(bool zeroForOne, bool vaultPoolZeroForOne, uint160 sqrtPriceLimit, int256 amountSpecified)
-        private
-        returns (uint256 amountIn, uint256 amountOut)
-    {
+    function _handleExactOutput(
+        bool zeroForOne,
+        bool vaultPoolZeroForOne,
+        uint160 sqrtPriceLimit,
+        int256 amountSpecified
+    ) private returns (uint256 amountIn, uint256 amountOut) {
         IERC4626 vaultWrapperIn = zeroForOne ? vaultWrapper0 : vaultWrapper1;
         IERC4626 vaultWrapperOut = zeroForOne ? vaultWrapper1 : vaultWrapper0;
         IERC4626 underlyingVaultIn = zeroForOne ? underlyingVault0 : underlyingVault1;
