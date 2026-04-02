@@ -120,8 +120,8 @@ contract SmoothYieldVaultTest is Test {
     function test_name_and_symbol() public {
         assertEq(underlying.name(), "ERC20Mock");
         assertEq(underlying.symbol(), "E20M");
-        assertEq(vault.name(), "Smoothed Wrapped ERC20Mock");
-        assertEq(vault.symbol(), "SW-E20M");
+        assertEq(vault.name(), "Smoothed Yield ERC20Mock");
+        assertEq(vault.symbol(), "SY-E20M");
     }
 
     function test_setSmoothingPeriod(uint256 newSmoothingPeriod) public {
