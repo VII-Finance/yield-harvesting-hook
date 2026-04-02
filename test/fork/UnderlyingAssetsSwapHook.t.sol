@@ -2,18 +2,20 @@
 pragma solidity ^0.8.13;
 
 import {BaseAssetSwapHookForkTest} from "test/fork/BaseAssetSwapHookForkTest.t.sol";
-import {SinglePairAssetSwapHook} from "src/periphery/SinglePairAssetSwapHook/SinglePairAssetSwapHook.sol";
-import {SinglePairAssetSwapHookFactory} from "src/periphery/SinglePairAssetSwapHook/SinglePairAssetSwapHookFactory.sol";
+import {UnderlyingAssetsSwapHook} from "src/periphery/UnderlyingAssetsSwapHook/UnderlyingAssetsSwapHook.sol";
+import {
+    UnderlyingAssetsSwapHookFactory
+} from "src/periphery/UnderlyingAssetsSwapHook/UnderlyingAssetsSwapHookFactory.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 
-contract SinglePairAssetSwapHookForkTest is BaseAssetSwapHookForkTest {
-    SinglePairAssetSwapHookFactory public factory;
-    SinglePairAssetSwapHook public hook;
+contract UnderlyingAssetsSwapHookForkTest is BaseAssetSwapHookForkTest {
+    UnderlyingAssetsSwapHookFactory public factory;
+    UnderlyingAssetsSwapHook public hook;
 
     function _deployHookAndInitPool() internal override {
-        factory = new SinglePairAssetSwapHookFactory(poolManager);
+        factory = new UnderlyingAssetsSwapHookFactory(poolManager);
 
         (address vw0, address vw1) = address(vaultWrapper0) < address(vaultWrapper1)
             ? (address(vaultWrapper0), address(vaultWrapper1))

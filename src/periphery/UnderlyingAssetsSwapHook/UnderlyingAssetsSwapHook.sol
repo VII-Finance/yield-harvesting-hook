@@ -26,7 +26,7 @@ import {IAllowanceTransfer} from "lib/v4-periphery/lib/permit2/src/interfaces/IA
 /// @dev Can only be attached to a pool by the factory that deployed it (enforced via beforeInitialize).
 /// @dev Adding liquidity directly to the asset pool is blocked; liquidity must be added to the underlying
 ///      vault wrapper pool via the yield harvesting hook.
-contract SinglePairAssetSwapHook is BaseHook, IHookEvents {
+contract UnderlyingAssetsSwapHook is BaseHook, IHookEvents {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
     using SafeCast for int256;
@@ -68,6 +68,9 @@ contract SinglePairAssetSwapHook is BaseHook, IHookEvents {
     ///      in which case the asset pool's zeroForOne must be flipped before selecting a vault wrapper.
     bool public immutable isAsset0Currency0;
 
+    uint24 public immutable fee;
+    int24 public immutable tickSpacing;
+
     PoolKey private vaultWrapperPoolKey;
 
     constructor(
@@ -75,8 +78,8 @@ contract SinglePairAssetSwapHook is BaseHook, IHookEvents {
         IHooks _yieldHarvestingHook,
         IERC4626 _vaultWrapper0,
         IERC4626 _vaultWrapper1,
-        uint24 fee,
-        int24 tickSpacing,
+        uint24 _fee,
+        int24 _tickSpacing,
         address _factory
     ) BaseHook(_poolManager) {
         factory = _factory;
@@ -94,6 +97,9 @@ contract SinglePairAssetSwapHook is BaseHook, IHookEvents {
         isVaultWrapper0LessThanVaultWrapper1 = address(_vaultWrapper0) < address(_vaultWrapper1);
         isAsset0Currency0 = address(asset0) < address(asset1);
 
+        fee = _fee;
+        tickSpacing = _tickSpacing;
+
         vaultWrapperPoolKey = PoolKey({
             currency0: isVaultWrapper0LessThanVaultWrapper1
                 ? Currency.wrap(address(_vaultWrapper0))
@@ -101,8 +107,8 @@ contract SinglePairAssetSwapHook is BaseHook, IHookEvents {
             currency1: isVaultWrapper0LessThanVaultWrapper1
                 ? Currency.wrap(address(_vaultWrapper1))
                 : Currency.wrap(address(_vaultWrapper0)),
-            fee: fee,
-            tickSpacing: tickSpacing,
+            fee: _fee,
+            tickSpacing: _tickSpacing,
             hooks: _yieldHarvestingHook
         });
 
