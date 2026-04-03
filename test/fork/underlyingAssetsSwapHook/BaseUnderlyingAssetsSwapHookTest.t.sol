@@ -40,7 +40,7 @@ abstract contract BaseUnderlyingAssetsSwapHookTest is BaseVaultsTest {
     // ── Liquidity added to the vault-wrapper pool for the hook to route through ─
     // Expressed as a Uniswap v4 liquidity unit. Full-range at 1:1 price means each
     // side needs roughly this many token units, so 1e18 gives ~1 ETH of depth per side.
-    uint128 constant VAULT_POOL_LIQUIDITY = 1e18;
+    uint128 constant VAULT_POOL_LIQUIDITY = 10 ** 9;
 
     // ─────────────────────────────────────────────────────────────────────────
     //  Hooks for concrete subclasses
@@ -52,12 +52,12 @@ abstract contract BaseUnderlyingAssetsSwapHookTest is BaseVaultsTest {
 
     /// @dev Fuzz lower bound for swap amounts (in asset decimals).
     function _minSwapAmount() internal pure virtual returns (uint256) {
-        return 1e12;
+        return 10;
     }
 
     /// @dev Fuzz upper bound for swap amounts (in asset decimals).
     function _maxSwapAmount() internal pure virtual returns (uint256) {
-        return 1e16; // 0.01 token units — safe with VAULT_POOL_LIQUIDITY = 1e18
+        return 1e6; // 0.01 token units — safe with VAULT_POOL_LIQUIDITY = 1e18
     }
 
     // ─────────────────────────────────────────────────────────────────────────

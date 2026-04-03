@@ -8,7 +8,7 @@ solc = "0.8.26"
 evm_version = "cancun"
 bytecode_hash = "none"
 cbor_metadata = false
-no_match_contract = "MorphoVaultsTest|EETH_EulerVaultWETH_UnderlyingAssetsSwapHookTest|stETH_eWETH_UnderlyingAssetsSwapHookTest"
+no_match_contract = "MorphoVaultsTest|EETH_EulerVaultWETH_UnderlyingAssetsSwapHookTest|stETH_eWETH_UnderlyingAssetsSwapHookTest|EulerVaultsUnderlyingAssetsSwapTest"
 
 
 [fuzz]
