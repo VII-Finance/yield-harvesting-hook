@@ -257,7 +257,10 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         return (yield0, yield1);
     }
 
-    function test_yieldAndHarvestBeforeRemoveLiquidity(uint256 yield0, uint256 yield1, bool isAaveWrapper) public {
+    function test_yieldAndHarvestBeforeRemoveLiquidity(uint256 yield0, uint256 yield1, bool isAaveWrapper)
+        public
+        virtual
+    {
         setUpVaults(isAaveWrapper);
 
         uint256 underlyingVaultShares0 = _deposit(underlyingVault0, 20_000, address(this));
@@ -313,7 +316,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         uint256 yield0,
         uint256 yield1,
         bool isAaveWrapper
-    ) public {
+    ) public virtual {
         setUpVaults(isAaveWrapper);
         //liquidity to full range to make test simpler
         params.tickLower = TickMath.minUsableTick(poolKey.tickSpacing);
@@ -462,6 +465,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
 
     function test_mixedPoolYieldHarvesting(ModifyLiquidityParams memory params, uint256 vaultYield, bool isAaveWrapper)
         public
+        virtual
     {
         setUpVaults(isAaveWrapper);
         // Test yield harvesting in a mixed pool (one vault wrapper + one raw asset)
@@ -591,7 +595,7 @@ contract YieldHarvestingHookTest is Fuzzers, Test {
         }
     }
 
-    function testPoolInitializationFailsIfNotFactory(uint160 sqrtPriceX96, bool isAaveWrapper) public {
+    function testPoolInitializationFailsIfNotFactory(uint160 sqrtPriceX96, bool isAaveWrapper) public virtual {
         setUpVaults(isAaveWrapper);
 
         PoolKey memory PoolKeyNotYetInitialised = PoolKey({

@@ -195,13 +195,15 @@ contract UnderlyingAssetsSwapHook is BaseHook, IHookEvents {
     ) private returns (uint256 amountIn, uint256 amountOut) {
         IERC4626 vaultWrapperIn = zeroForOne ? vaultWrapper0 : vaultWrapper1;
         IERC4626 vaultWrapperOut = zeroForOne ? vaultWrapper1 : vaultWrapper0;
+        IERC20 assetIn = zeroForOne ? asset0 : asset1;
+        IERC20 assetOut = zeroForOne ? asset1 : asset0;
         IERC4626 underlyingVaultIn = zeroForOne ? underlyingVault0 : underlyingVault1;
         IERC4626 underlyingVaultOut = zeroForOne ? underlyingVault1 : underlyingVault0;
 
         amountIn = (-amountSpecified).toUint256();
-        uint256 sharesIn = _depositToVaultWrapper(underlyingVaultIn, vaultWrapperIn, amountIn);
+        uint256 sharesIn = _depositToVaultWrapper(underlyingVaultIn, assetIn, vaultWrapperIn, amountIn);
         uint256 sharesOut = _swapInVaultPool(vaultPoolZeroForOne, sqrtPriceLimit, sharesIn, true);
-        amountOut = _redeemFromVaultWrapper(vaultWrapperOut, underlyingVaultOut, sharesOut);
+        amountOut = _redeemFromVaultWrapper(vaultWrapperOut, assetOut, underlyingVaultOut, sharesOut);
     }
 
     function _handleExactOutput(
@@ -212,25 +214,27 @@ contract UnderlyingAssetsSwapHook is BaseHook, IHookEvents {
     ) private returns (uint256 amountIn, uint256 amountOut) {
         IERC4626 vaultWrapperIn = zeroForOne ? vaultWrapper0 : vaultWrapper1;
         IERC4626 vaultWrapperOut = zeroForOne ? vaultWrapper1 : vaultWrapper0;
+        IERC20 assetIn = zeroForOne ? asset0 : asset1;
+        IERC20 assetOut = zeroForOne ? asset1 : asset0;
         IERC4626 underlyingVaultIn = zeroForOne ? underlyingVault0 : underlyingVault1;
         IERC4626 underlyingVaultOut = zeroForOne ? underlyingVault1 : underlyingVault0;
 
         amountOut = amountSpecified.toUint256();
         uint256 sharesNeeded = vaultWrapperOut.previewWithdraw(underlyingVaultOut.previewWithdraw(amountOut));
         uint256 sharesIn = _swapInVaultPool(vaultPoolZeroForOne, sqrtPriceLimit, sharesNeeded, false);
-        _redeemFromVaultWrapper(vaultWrapperOut, underlyingVaultOut, sharesNeeded);
-        amountIn = _mintVaultWrapper(underlyingVaultIn, vaultWrapperIn, sharesIn);
+        _redeemFromVaultWrapper(vaultWrapperOut, assetOut, underlyingVaultOut, sharesNeeded);
+        amountIn = _mintVaultWrapper(underlyingVaultIn, assetIn, vaultWrapperIn, sharesIn);
     }
 
     // ── Conversion helpers ───────────────────────────────────────────────────
 
     /// @dev Take raw asset from pool manager, deposit through both vault layers, settle vault wrapper shares.
-    function _depositToVaultWrapper(IERC4626 underlyingVault, IERC4626 vaultWrapper, uint256 assetAmount)
+    function _depositToVaultWrapper(IERC4626 underlyingVault, IERC20 asset, IERC4626 vaultWrapper, uint256 assetAmount)
         private
         returns (uint256 vaultWrapperShares)
     {
         poolManager.sync(Currency.wrap(address(vaultWrapper)));
-        poolManager.take(Currency.wrap(address(IERC20(underlyingVault.asset()))), address(this), assetAmount);
+        poolManager.take(Currency.wrap(address(asset)), address(this), assetAmount);
         uint256 underlyingShares = underlyingVault.deposit(assetAmount, address(this));
         vaultWrapperShares = vaultWrapper.deposit(underlyingShares, address(poolManager));
         poolManager.settle();
@@ -238,11 +242,13 @@ contract UnderlyingAssetsSwapHook is BaseHook, IHookEvents {
 
     /// @dev Take vault wrapper shares from pool manager, redeem through both vault layers, settle raw asset.
     ///      Returns the raw asset amount received.
-    function _redeemFromVaultWrapper(IERC4626 vaultWrapper, IERC4626 underlyingVault, uint256 vaultWrapperShares)
-        private
-        returns (uint256 assetAmount)
-    {
-        poolManager.sync(Currency.wrap(address(IERC20(underlyingVault.asset()))));
+    function _redeemFromVaultWrapper(
+        IERC4626 vaultWrapper,
+        IERC20 asset,
+        IERC4626 underlyingVault,
+        uint256 vaultWrapperShares
+    ) private returns (uint256 assetAmount) {
+        poolManager.sync(Currency.wrap(address(asset)));
         poolManager.take(Currency.wrap(address(vaultWrapper)), address(this), vaultWrapperShares);
         uint256 underlyingShares = vaultWrapper.redeem(vaultWrapperShares, address(this), address(this));
         assetAmount = underlyingVault.redeem(underlyingShares, address(poolManager), address(this));
@@ -251,14 +257,16 @@ contract UnderlyingAssetsSwapHook is BaseHook, IHookEvents {
 
     /// @dev Take raw asset from pool manager, mint the exact number of vault wrapper shares needed, settle.
     ///      Returns the actual raw asset amount consumed.
-    function _mintVaultWrapper(IERC4626 underlyingVault, IERC4626 vaultWrapper, uint256 vaultWrapperShares)
-        private
-        returns (uint256 assetAmount)
-    {
+    function _mintVaultWrapper(
+        IERC4626 underlyingVault,
+        IERC20 asset,
+        IERC4626 vaultWrapper,
+        uint256 vaultWrapperShares
+    ) private returns (uint256 assetAmount) {
         poolManager.sync(Currency.wrap(address(vaultWrapper)));
         uint256 underlyingSharesNeeded = vaultWrapper.previewMint(vaultWrapperShares);
         uint256 estimatedAsset = underlyingVault.previewMint(underlyingSharesNeeded);
-        poolManager.take(Currency.wrap(address(IERC20(underlyingVault.asset()))), address(this), estimatedAsset);
+        poolManager.take(Currency.wrap(address(asset)), address(this), estimatedAsset);
         assetAmount = underlyingVault.mint(underlyingSharesNeeded, address(this));
         vaultWrapper.mint(vaultWrapperShares, address(poolManager));
         poolManager.settle();

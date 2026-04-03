@@ -12,7 +12,9 @@ import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {HookMiner} from "lib/v4-periphery/src/utils/HookMiner.sol";
 import {YieldHarvestingHook} from "src/YieldHarvestingHook.sol";
 import {UnderlyingAssetsSwapHook} from "src/periphery/UnderlyingAssetsSwapHook/UnderlyingAssetsSwapHook.sol";
-import {UnderlyingAssetsSwapHookFactory} from "src/periphery/UnderlyingAssetsSwapHook/UnderlyingAssetsSwapHookFactory.sol";
+import {
+    UnderlyingAssetsSwapHookFactory
+} from "src/periphery/UnderlyingAssetsSwapHook/UnderlyingAssetsSwapHookFactory.sol";
 import {MockERC20} from "test/utils/MockERC20.sol";
 import {MockERC4626} from "test/utils/MockERC4626.sol";
 
@@ -163,8 +165,12 @@ contract UnderlyingAssetsSwapHookFactoryTest is Test {
         MockERC4626 vw0 = MockERC4626(Currency.unwrap(vaultWrapperPoolKey.currency0));
         MockERC4626 vw1 = MockERC4626(Currency.unwrap(vaultWrapperPoolKey.currency1));
 
-        assertEq(address(hook.underlyingVault0()), address(vw0.asset()), "underlyingVault0 should be vaultWrapper0.asset()");
-        assertEq(address(hook.underlyingVault1()), address(vw1.asset()), "underlyingVault1 should be vaultWrapper1.asset()");
+        assertEq(
+            address(hook.underlyingVault0()), address(vw0.asset()), "underlyingVault0 should be vaultWrapper0.asset()"
+        );
+        assertEq(
+            address(hook.underlyingVault1()), address(vw1.asset()), "underlyingVault1 should be vaultWrapper1.asset()"
+        );
 
         MockERC4626 uv0 = MockERC4626(address(vw0.asset()));
         MockERC4626 uv1 = MockERC4626(address(vw1.asset()));

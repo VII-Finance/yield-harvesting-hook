@@ -13,9 +13,13 @@ contract BaseVaultsTest is YieldHarvestingHookTest {
         return PoolManager(POOL_MANAGER);
     }
 
+    function _getForkBlock() internal pure virtual returns (uint256) {
+        return 23101344;
+    }
+
     function setUp() public virtual override {
         string memory fork_url = vm.envString("MAINNET_RPC_URL");
-        vm.createSelectFork(fork_url, 23101344);
+        vm.createSelectFork(fork_url, _getForkBlock());
 
         super.setUp();
     }
