@@ -2,6 +2,7 @@
 src = "src"
 out = "out"
 libs = ["lib"]
+gas_limit = 100_000_000_000
 optimizer = true
 optimizer_runs = 1_000_000
 solc = "0.8.26"
