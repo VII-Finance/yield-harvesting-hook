@@ -109,7 +109,7 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
         }
 
         uint256 currentWETHBalance = weth.balanceOf(address(this));
-        //we allow paying for pair with native eth using WETH so we do this conversion but we should not do it if 
+        //we allow paying for pair with native eth using WETH so we do this conversion but we should not do it if
         //currency0 is not native eth
         if (currentWETHBalance > 0 && poolKey.currency0.isAddressZero()) {
             weth.withdraw(currentWETHBalance);
@@ -119,7 +119,6 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
         if (Currency.unwrap(poolKey.currency0) > Currency.unwrap(poolKey.currency1)) {
             (poolKey.currency0, poolKey.currency1) = (poolKey.currency1, poolKey.currency0);
         }
-        
 
         return poolKey;
     }
