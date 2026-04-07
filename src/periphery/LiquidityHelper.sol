@@ -71,11 +71,6 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
             IERC20(Currency.unwrap(poolKey.currency1)).safeTransferFrom(_msgSender(), address(this), amount1Max);
         }
 
-        uint256 currentWETHBalance = weth.balanceOf(address(this));
-        if (currentWETHBalance > 0) {
-            weth.withdraw(currentWETHBalance);
-        }
-
         amount0Max = SafeCast.toUint128(poolKey.currency0.balanceOf(address(this)));
         amount1Max = SafeCast.toUint128(poolKey.currency1.balanceOf(address(this)));
 
@@ -113,10 +108,18 @@ contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
             poolKey.currency1.transfer(address(positionManager), amount1Max);
         }
 
+        uint256 currentWETHBalance = weth.balanceOf(address(this));
+        //we allow paying for pair with native eth using WETH so we do this conversion but we should not do it if 
+        //currency0 is not native eth
+        if (currentWETHBalance > 0 && poolKey.currency0.isAddressZero()) {
+            weth.withdraw(currentWETHBalance);
+        }
+
         //currencies might be out of order at this point, so we need to sort them
         if (Currency.unwrap(poolKey.currency0) > Currency.unwrap(poolKey.currency1)) {
             (poolKey.currency0, poolKey.currency1) = (poolKey.currency1, poolKey.currency0);
         }
+        
 
         return poolKey;
     }
