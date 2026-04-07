@@ -42,6 +42,7 @@ abstract contract ETHToWrappedLSTSwapHookBase is BaseHook, IHookEvents, IUnlockC
     address public constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
     Currency public constant ETH_CURRENCY = Currency.wrap(address(0));
     uint256 public constant Q96_INVERSE_CONSTANT = 2 ** 192;
+    uint160 public constant SQRT_PRICE_1_1 = 79228162514264337593543950336;
 
     IHooks public immutable yieldHarvestingHook;
     IERC4626 public immutable wethVault;
@@ -84,8 +85,7 @@ abstract contract ETHToWrappedLSTSwapHookBase is BaseHook, IHookEvents, IUnlockC
         address _wrappedLST,
         IHooks _yieldHarvestingHook,
         uint24 _fee,
-        int24 _tickSpacing,
-        uint160 _initialSqrtPriceX96
+        int24 _tickSpacing
     ) BaseHook(_poolManager) {
         yieldHarvestingHook = _yieldHarvestingHook;
         wethVault = _wethVault;
@@ -126,7 +126,7 @@ abstract contract ETHToWrappedLSTSwapHookBase is BaseHook, IHookEvents, IUnlockC
                 tickSpacing: _tickSpacing,
                 hooks: IHooks(address(this))
             }),
-            _initialSqrtPriceX96
+            SQRT_PRICE_1_1
         );
     }
 

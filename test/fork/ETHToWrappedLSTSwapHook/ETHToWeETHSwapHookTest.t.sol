@@ -55,8 +55,7 @@ contract ETHToWeETHSwapHookTest is ETHToWrappedLSTSwapHookBaseTest {
             lstVW,
             IHooks(address(yieldHarvestingHook)),
             uint24(3000),
-            int24(60),
-            Constants.SQRT_PRICE_1_1
+            int24(60)
         );
 
         (, bytes32 salt) = HookMiner.find(address(this), flags, type(ETHToWeETHSwapHook).creationCode, constructorArgs);
@@ -69,8 +68,7 @@ contract ETHToWeETHSwapHookTest is ETHToWrappedLSTSwapHookBaseTest {
             lstVW,
             IHooks(address(yieldHarvestingHook)),
             3000,
-            60,
-            Constants.SQRT_PRICE_1_1
+            60
         );
 
         hook = weETHHook;

@@ -23,7 +23,7 @@ interface IPositionManagerExtended is IPositionManager {
 /// @dev This doesn't support aave vaults. Only vault wrappers that have underlying vaults that support ERC4626 interface are supported.
 /// @dev This contract will have approvals of the Liquidity Positions NFTs. We only care about bugs that lead to loss of NFTs here.
 ///      Otherwise it is up to the user to make sure this contract doesn't hold any funds.
-/// TODO: Right now, when we call SWEEP, if it is vault wrappers, user is getting the raw vault wrappers.
+/// @dev Right now, when we call SWEEP, if it is vault wrappers, user is getting the raw vault wrappers.
 /// We need to take those and convert them back into the raw assets if specified. (Do it in case of L2. Do not do it if it is mainnet)
 contract LiquidityHelper is EVCUtil, BaseAssetToVaultWrapperHelper {
     using SafeERC20 for IERC20;

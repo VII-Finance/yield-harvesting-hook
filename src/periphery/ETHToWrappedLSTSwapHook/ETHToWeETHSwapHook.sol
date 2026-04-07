@@ -29,8 +29,7 @@ contract ETHToWeETHSwapHook is ETHToWrappedLSTSwapHookBase {
         IERC4626 _eETHVaultWrapper,
         IHooks _yieldHarvestingHook,
         uint24 _fee,
-        int24 _tickSpacing,
-        uint160 _initialSqrtPriceX96
+        int24 _tickSpacing
     )
         ETHToWrappedLSTSwapHookBase(
             _poolManager,
@@ -42,8 +41,7 @@ contract ETHToWeETHSwapHook is ETHToWrappedLSTSwapHookBase {
             WE_ETH,
             _yieldHarvestingHook,
             _fee,
-            _tickSpacing,
-            _initialSqrtPriceX96
+            _tickSpacing
         )
     {}
 

@@ -13,6 +13,7 @@ import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
+import {ETHToWstETHSwapHook} from "src/periphery/ETHToWrappedLSTSwapHook/ETHToWstETHSwapHook.sol";
 
 contract PeripheryContractsScript is Script {
     uint160 constant HOOK_PERMISSIONS = uint160(Hooks.BEFORE_SWAP_FLAG) | uint160(Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG)
@@ -22,11 +23,11 @@ contract PeripheryContractsScript is Script {
 
     function run() external {
         address owner = 0x12e74f3C61F6b4d17a9c3Fdb3F42e8f18a8bB394;
-        IPoolManager poolManager = IPoolManager(0x1F98400000000000000000000000000000000004);
+        IPoolManager poolManager = IPoolManager(0x000000000004444c5dc75cB358380D2e3dE08A90);
 
-        address evc = 0x2A1176964F5D7caE5406B627Bf6166664FE83c60;
-        IPositionManager positionManager = IPositionManager(0x4529A01c7A0410167c5740C487A8DE60232617bf);
-        YieldHarvestingHook yieldHarvestingHook = YieldHarvestingHook(0x77A19c56605a185002Da73C6ff92B61224356A80);
+        address evc = 0x0C9a3dd6b8F28529d72d7f9cE918D493519EE383;
+        IPositionManager positionManager = IPositionManager(0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e);
+        YieldHarvestingHook yieldHarvestingHook = YieldHarvestingHook(0x777ADCF55501b3494a188cb8dBE415CF8d942a80);
 
         // Deploy AssetToAssetSwapHookForERC4626
         (, bytes32 assetToAssetSalt) = HookMiner.find(
@@ -37,14 +38,14 @@ contract PeripheryContractsScript is Script {
         );
         vm.startBroadcast();
 
-        AssetToAssetSwapHookForERC4626 assetToAssetSwapHook =
-            new AssetToAssetSwapHookForERC4626{salt: assetToAssetSalt}(poolManager, yieldHarvestingHook, owner);
+        // AssetToAssetSwapHookForERC4626 assetToAssetSwapHook =
+        //     new AssetToAssetSwapHookForERC4626{salt: assetToAssetSalt}(poolManager, yieldHarvestingHook, owner);
 
         // AssetToAssetSwapHookForERC4626 assetToAssetSwapHook =
         //     AssetToAssetSwapHookForERC4626(0x604E6C45FEe7D7634865603c37Ef1695D0f2C888);
 
         // Deploy LiquidityHelper
-        // LiquidityHelper liquidityHelper = new LiquidityHelper(evc, positionManager, yieldHarvestingHook);
+        LiquidityHelper liquidityHelper = new LiquidityHelper(evc, positionManager, yieldHarvestingHook);
 
         // PoolKey memory poolKey = PoolKey({
         //     currency0: Currency.wrap(0x078D782b760474a361dDA0AF3839290b0EF57AD6), // USDC
