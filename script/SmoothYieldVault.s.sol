@@ -4,7 +4,6 @@ pragma solidity ^0.8.26;
 import {Script, console} from "forge-std/Script.sol";
 import {IERC20, SmoothYieldVault} from "src/SmoothYieldVault.sol";
 
-
 contract SmoothYieldVaultDeployment is Script {
     function run() external {
         IERC20 asset = IERC20(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
