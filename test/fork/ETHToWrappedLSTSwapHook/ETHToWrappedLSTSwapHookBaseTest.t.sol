@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {BaseVaultsTest} from "test/fork/BaseVaultsTest.t.sol";
-import {ETHToWrappedLSTSwapHookBase} from "src/periphery/ETHToWrappedLSTSwapHookBase.sol";
+import {ETHToWrappedLSTSwapHookBase} from "src/periphery/ETHToWrappedLSTSwapHook/ETHToWrappedLSTSwapHookBase.sol";
 import {SmoothYieldVault} from "src/SmoothYieldVault.sol";
 import {MockERC4626} from "test/utils/MockERC4626.sol";
 import {IERC4626} from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";

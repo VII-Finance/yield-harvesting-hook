@@ -4,7 +4,7 @@ pragma solidity ^0.8.26;
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IERC4626} from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
-import {ETHToWrappedLSTSwapHookBase} from "src/periphery/ETHToWrappedLSTSwapHookBase.sol";
+import {ETHToWrappedLSTSwapHookBase} from "src/periphery/ETHToWrappedLSTSwapHook/ETHToWrappedLSTSwapHookBase.sol";
 
 interface IWeETH {
     function wrap(uint256 _eETHAmount) external returns (uint256);
