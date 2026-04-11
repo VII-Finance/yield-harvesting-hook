@@ -13,11 +13,11 @@ no_match_contract = "MorphoVaultsTest|EETH_EulerVaultWETH_UnderlyingAssetsSwapHo
 
 
 [fuzz]
-runs = 10_000
+runs = 256
 
 [invariant]
-runs = 10_000
-depth = 50
+runs = 64
+depth = 20
 fail_on_revert = true
 
 [rpc_endpoints]

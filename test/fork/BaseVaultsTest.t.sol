@@ -18,8 +18,9 @@ contract BaseVaultsTest is YieldHarvestingHookTest {
     }
 
     function setUp() public virtual override {
-        string memory fork_url = vm.envString("MAINNET_RPC_URL");
-        vm.createSelectFork(fork_url, _getForkBlock());
+        string memory forkUrl = vm.envOr("MAINNET_RPC_URL", string(""));
+        vm.skip(bytes(forkUrl).length == 0, "MAINNET_RPC_URL not set");
+        vm.createSelectFork(forkUrl, _getForkBlock());
 
         super.setUp();
     }

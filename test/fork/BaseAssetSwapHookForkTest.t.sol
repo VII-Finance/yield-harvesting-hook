@@ -47,8 +47,9 @@ abstract contract BaseAssetSwapHookForkTest is Test {
     IERC4626 public underlyingVault1;
 
     function setUp() public virtual {
-        string memory fork_url = vm.envString("UNICHAIN_RPC_URL");
-        vm.createSelectFork(fork_url, 29051161);
+        string memory forkUrl = vm.envOr("UNICHAIN_RPC_URL", string(""));
+        vm.skip(bytes(forkUrl).length == 0, "UNICHAIN_RPC_URL not set");
+        vm.createSelectFork(forkUrl, 29051161);
 
         evc = address(0x2A1176964F5D7caE5406B627Bf6166664FE83c60);
         weth = address(0x4200000000000000000000000000000000000006);
